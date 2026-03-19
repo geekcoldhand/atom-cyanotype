@@ -1,0 +1,10 @@
+.controls {
+  flex: 0 0 auto;
+  background: var(--c-panel);
+  border-top: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  /* Minimum height ensures sliders are always comfortably reachable */
+  min-height: 240px;
+  max-height: 46vh;
+}

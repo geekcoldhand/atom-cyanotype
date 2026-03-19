@@ -1,0 +1,19 @@
+:root {
+  /* Colors */
+  --c-bg:        #070c14;
+  --c-surface:   #0b1220;
+  --c-panel:     #0e1829;
+  --c-border:    rgba(80, 160, 255, 0.12);
+  --c-accent:    #3ab4ff;
+  --c-accent2:   #00e5ff;
+  --c-text:      #c8e4ff;
+  --c-muted:     #4a7090;
+  --c-track:     #1a2840;
+  --c-thumb:     #3ab4ff;
+
+  /* Spacing / sizing */
+  --radius:      12px;
+  --tab-h:       50px;
+  --header-h:    58px;
+  --controls-h:  260px;
+}

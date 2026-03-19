@@ -1,0 +1,61 @@
+.header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 18px 11px;
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-bg);
+  position: relative;
+  z-index: 10;
+}
+
+.brand {}
+
+.logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  color: #fff;
+  line-height: 1;
+}
+
+.accent {
+  color: var(--c-accent);
+}
+
+.sub {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--c-muted);
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+
+.saveBtn {
+  background: var(--c-accent);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-appearance: none;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.saveBtn:active {
+  transform: scale(0.96);
+}
+
+.saveBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  transform: none;
+}

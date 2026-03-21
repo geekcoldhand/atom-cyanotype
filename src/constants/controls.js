@@ -3,17 +3,17 @@ export const GRAIN_SVG = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' x
 
 /** Default slider values — Y2K Cyber Minimalism preset */
 export const DEFAULTS = {
-	blueDepth: 40, // deep navy/steel blue — shadows and base
-	tealDepth: 30, // teal midtone push
-	cyanDepth: 25, // electric cyan highlight lift
+	blueDepth: 50, // deep navy/steel blue — shadows and base
+	tealDepth: 17, // teal midtone push
+	cyanDepth: 20, // electric cyan highlight lift
 	exposure: 30,
 	highlightLift: 20,
 	shadowLift: 15,
-	midtoneContrast: 20,
-	contrastSoft: -10,
+	midtoneContrast: 39,
+	contrastSoft: -39,
 	grain: 25,
 	lightWash: 40,
-	reflection: 25,
+	reflection: 45,
 };
 
 /** Tab labels in display order */
@@ -26,14 +26,16 @@ export const SLIDER_CONFIG = {
 		{ key: "tealDepth", label: "Teal Depth" },
 		{ key: "cyanDepth", label: "Cyan Depth" },
 		{ key: "reflection", label: "Reflection" },
-		{ key: "grain", label: "Grain" },
 	],
 	Tone: [
 		{ key: "exposure", label: "Exposure" },
 		{ key: "highlightLift", label: "Highlight" },
 		{ key: "shadowLift", label: "Shadow Lift" },
 		{ key: "midtoneContrast", label: "Midtone" },
+	],
+	Light: [
+		{ key: "lightWash", label: "Light Wash" },
+		{ key: "grain", label: "Grain" },
 		{ key: "contrastSoft", label: "Soften" },
 	],
-	Light: [{ key: "lightWash", label: "Light Wash" }],
 };

@@ -13,6 +13,7 @@ export function SliderPanel({ activeTab, controls, setControl }) {
       {sliders.map(({ key, label }) => (
         <SliderRow
           key={key}
+          sliderKey={key}
           label={label}
           value={controls[key]}
           onChange={setControl(key)}

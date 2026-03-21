@@ -2,95 +2,132 @@ import { GRAIN_SVG } from "../../constants/controls.js";
 import styles from "./FilterStack.module.css";
 
 /**
- * Renders the live filter preview:
- *   <img> base with CSS filter  +  overlay divs using mix-blend-mode
- *   +  dust <canvas> (screen blend)
- * @note
- * The <canvas> is only rendered when an image is loaded, and
- * canvas is only used for dust particles (updated on dust value change).
+ * Renders the live Y2K Cyber Minimalism filter preview.
+ * All effects are GPU-compositor-only — no pixel loops during interaction.
+ *
+ * Layer stack:
+ *   base (CSS filter) → baseTint → lightWash → highlightLift
+ *   → reflection → grain → shadowControl
  */
 export function FilterStack({ imgSrc, controls, imgRef, canvasRef, onLoad }) {
 	const {
 		blueDepth,
-		crush,
-		midtoneFade,
-		bloom,
+		tealDepth,
+		cyanDepth,
+		exposure,
+		highlightLift,
+		shadowLift,
+		midtoneContrast,
+		contrastSoft,
 		grain,
-		dust,
-		bloomSpread,
-		backlightHaze,
-		lightLeak,
+		lightWash,
+		reflection,
 	} = controls;
 
-	//base filter
+	// ── Base image CSS filter ──────────────────────────────────────
+	// contrastSoft is negative by default — clamp to avoid inverting
+	const contrastVal = Math.max(
+		0.5,
+		1 + midtoneContrast * 0.006 + contrastSoft * 0.004
+	);
+	// exposure is the primary brightness driver; shadowLift adds a smaller lift
+	const brightnessVal = Math.max(
+		0.5,
+		1 + exposure * 0.008 + shadowLift * 0.004
+	);
+	// Mild desaturate at low bias; neutral at ~40; slight push above that.
+	// Kept gentle — the overlay layers do the heavy blue/cyan work.
+	const saturateVal = Math.max(0, 0.6 + blueDepth * 0.006);
+
 	const baseFilter = [
-		`contrast(${1 + crush * 0.004})`,
-		`saturate(${0.25 + blueDepth * 0.005})`,
-		`brightness(${1.0 + midtoneFade * 0.002})`,
+		`contrast(${contrastVal})`,
+		`brightness(${brightnessVal})`,
+		`saturate(${saturateVal})`,
 	].join(" ");
 
-	// layer styles
-	const midAlpha = 0.2 + midtoneFade * 0.006;
-
+	// ── Layer style derivations ────────────────────────────────────
 	const layerStyles = {
-		mid: {
-			background: `radial-gradient(ellipse 90% 90% at 50% 50%,
-        rgba(20,60,120,${midtoneFade * 0.005 * midAlpha}) 0%,
-        rgba(0,20,70,${midtoneFade * 0.008 * midAlpha}) 100%)`,
+		// Steel-blue hue shift — 'hue' blend replaces only hue, not saturation,
+		// so it reliably reads as blue-steel even over warm source images.
+		// 'color' blend was causing orange artifacts on warm photos.
+		// Deep navy/steel — multiply covers the full image, drives into shadows.
+		// Flat solid fill so the slider controls intensity uniformly, not a gradient.
+		blueBase: {
+			background: "#0D2B6B",
 			mixBlendMode: "multiply",
-			opacity: midAlpha,
+			opacity: Math.min(0.9, blueDepth * 0.009),
 		},
-		blue: {
-			background: `radial-gradient(ellipse 120% 120% at 50% 40%,
-        rgba(0,80,200,${blueDepth * 0.006}) 0%,
-        rgba(0,30,100,${blueDepth * 0.008}) 60%,
-        rgba(0,10,60,${blueDepth * 0.009}) 100%)`,
-			mixBlendMode: "multiply",
-			opacity: 0.4 + blueDepth * 0.005,
-		},
-		cyan: {
-			background: `linear-gradient(160deg,
-        rgba(0,180,255,${blueDepth * 0.003}) 0%,
-        rgba(0,60,160,${blueDepth * 0.005}) 50%,
-        rgba(0,20,90,${blueDepth * 0.004}) 100%)`,
+
+		// Teal midtone push — color blend shifts overall hue toward teal.
+		// Flat solid fill, slider controls how strongly it shifts.
+		tealGrade: {
+			background: "#0A7A8A",
 			mixBlendMode: "color",
-			opacity: blueDepth * 0.008,
+			opacity: Math.min(0.9, tealDepth * 0.009),
 		},
+
+		// Cyan lift — screen blend brightens into electric cyan across the whole frame.
+		// Flat solid fill, slider controls luminance push intensity.
+		cyanLift: {
+			background: "#00C8E0",
+			mixBlendMode: "screen",
+			opacity: Math.min(0.8, cyanDepth * 0.008),
+		},
+
+		// Top-down structured architectural light wash
+		lightWash: {
+			background: `linear-gradient(180deg,
+        rgba(230,247,255,${Math.min(1, 0.2 + lightWash * 0.008)}) 0%,
+        rgba(207,239,255,${Math.min(1, 0.1 + lightWash * 0.006)}) 35%,
+        rgba(111,186,217,${Math.min(1, 0.02 + lightWash * 0.002)}) 65%,
+        transparent 100%)`,
+			mixBlendMode: "screen",
+			opacity: Math.min(1, 0.3 + lightWash * 0.005),
+		},
+
+		// Clean bright top-of-frame highlight band
+		highlightLift: {
+			background: `radial-gradient(
+        ellipse 80% 45% at 50% 0%,
+        rgba(255,255,255,${Math.min(1, highlightLift * 0.012)}) 0%,
+        rgba(207,239,255,${Math.min(1, highlightLift * 0.007)}) 50%,
+        transparent 100%)`,
+			mixBlendMode: "screen",
+			opacity: Math.min(1, 0.1 + highlightLift * 0.012),
+		},
+
+		// Diagonal glass shimmer overlay
+		reflection: {
+			background: `linear-gradient(135deg,
+        rgba(255,255,255,${Math.min(0.9, 0.05 + reflection * 0.006)}) 0%,
+        rgba(207,239,255,${Math.min(0.9, 0.03 + reflection * 0.004)}) 50%,
+        rgba(255,255,255,${Math.min(0.9, 0.04 + reflection * 0.005)}) 100%)`,
+			mixBlendMode: "overlay",
+			opacity: Math.min(1, 0.1 + reflection * 0.007),
+		},
+
+		// Grain — multiplier raised to 0.009 so default 25 → opacity 0.225,
+		// well above the ~0.08 threshold where overlay blend becomes visible.
+		// Max at 100 → 0.9, clamped to 0.65 to stay tasteful.
 		grain: {
 			backgroundImage: GRAIN_SVG,
 			backgroundSize: "200px 200px",
 			backgroundRepeat: "repeat",
 			mixBlendMode: "overlay",
-			opacity: grain * 0.011,
-			animation: "grain-shift 0.12s steps(1) infinite",
+			// 0 → 0  |  25 (default) → 0.225  |  100 → 0.65 (clamped)
+			opacity: Math.min(0.65, grain * 0.009),
 		},
-		bloom: {
-			background: `radial-gradient(
-        ellipse ${40 + bloomSpread * 0.5}% ${
-				40 + bloomSpread * 0.4
-			}% at 50% 30%,
-        rgba(180,230,255,${bloom * 0.007}) 0%,
-        rgba(100,180,255,${bloom * 0.004}) 40%,
-        transparent 70%)`,
-			mixBlendMode: "screen",
-			opacity: bloom * 0.012,
-		},
-		haze: {
-			background: `radial-gradient(ellipse 100% 100% at 50% 50%,
-        transparent 30%,
-        rgba(0,60,140,${backlightHaze * 0.012}) 70%,
-        rgba(0,20,80,${backlightHaze * 0.018}) 100%)`,
-			mixBlendMode: "overlay",
-			opacity: backlightHaze * 0.014,
-		},
-		leak: {
-			background: `
-        radial-gradient(ellipse 60% 40% at 0% 0%,
-          rgba(255,120,20,${lightLeak * 0.008}) 0%, transparent 60%),
-        radial-gradient(ellipse 40% 60% at 100% 100%,
-          rgba(255,60,100,${lightLeak * 0.006}) 0%, transparent 60%)`,
-			mixBlendMode: "screen",
-			opacity: lightLeak * 0.013,
+
+		// Shadow control — edge vignette, lifts inversely with shadowLift
+		shadowControl: {
+			background: `radial-gradient(ellipse 110% 110% at 50% 50%,
+        transparent 25%,
+        rgba(10,26,47,${Math.min(
+					0.8,
+					0.05 + (100 - shadowLift) * 0.003
+				)}) 100%)`,
+			mixBlendMode: "multiply",
+			opacity: 0.7,
 		},
 	};
 
@@ -105,20 +142,26 @@ export function FilterStack({ imgSrc, controls, imgRef, canvasRef, onLoad }) {
 				onLoad={onLoad}
 			/>
 
-			{/* layer stack...order matters */}
-			<div className={styles.overlay} style={layerStyles.mid} />
-			<div className={styles.overlay} style={layerStyles.blue} />
-			<div className={styles.overlay} style={layerStyles.cyan} />
+			{/* Layer stack — order matters */}
+			<div className={styles.overlay} style={layerStyles.blueBase} />
+			<div className={styles.overlay} style={layerStyles.tealGrade} />
+			<div className={styles.overlay} style={layerStyles.cyanLift} />
+			<div className={styles.overlay} style={layerStyles.lightWash} />
+			<div className={styles.overlay} style={layerStyles.highlightLift} />
+			<div className={styles.overlay} style={layerStyles.reflection} />
 			<div className={styles.overlay} style={layerStyles.grain} />
-			<div className={styles.overlay} style={layerStyles.bloom} />
-			<div className={styles.overlay} style={layerStyles.haze} />
-			<div className={styles.overlay} style={layerStyles.leak} />
-
-			{/* Dust canvas.. see top note */}
+			<div className={styles.overlay} style={layerStyles.shadowControl} />
 			<canvas
 				ref={canvasRef}
 				className={styles.overlay}
-				style={{ mixBlendMode: "screen", opacity: dust * 0.008 }}
+				style={{ opacity: 0 }}
+			/>
+
+			{/* Canvas kept for hook compatibility — not painted in this aesthetic */}
+			<canvas
+				ref={canvasRef}
+				className={styles.overlay}
+				style={{ opacity: 0 }}
 			/>
 		</div>
 	);

@@ -42,40 +42,41 @@ export function renderToBlob(img, s) {
 		// Canvas 2D does not support 'hue' globalCompositeOperation natively,
 		// so we approximate with a low-opacity 'color' pass at a reduced alpha
 		// which achieves a similar steel-blue push without the orange cast.
-		ctx.globalCompositeOperation = "multiply";
-		ctx.globalAlpha = Math.min(0.9, s.blueDepth * 0.009);
-		ctx.fillStyle = "#0D2B6B";
-		ctx.fillRect(0, 0, W, H);
-		ctx.globalAlpha = 1;
-		ctx.globalCompositeOperation = "source-over";
-
-		// ── 3. Teal depth — color shift, full frame ───────────────────
-		// Canvas 2D has no 'color' blend — approximate with a low-opacity
-		// multiply pass (shifts toward teal in shadows) followed by a
-		// screen pass (lifts midtones toward teal), matching the CSS result.
 		{
-			ctx.globalCompositeOperation = "multiply";
-			ctx.globalAlpha = Math.min(0.6, s.tealDepth * 0.006);
-			ctx.fillStyle = "#0A7A8A";
-			ctx.fillRect(0, 0, W, H);
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "source-over";
-
-			ctx.globalCompositeOperation = "screen";
-			ctx.globalAlpha = Math.min(0.4, s.tealDepth * 0.004);
-			ctx.fillStyle = "#0A7A8A";
+			ctx.globalCompositeOperation = "color";
+			ctx.globalAlpha = Math.min(0.5, s.blueDepth * 0.004); // half the opacity of 'hue' to compensate
+			ctx.fillStyle = "#2A6496";
 			ctx.fillRect(0, 0, W, H);
 			ctx.globalAlpha = 1;
 			ctx.globalCompositeOperation = "source-over";
 		}
 
-		// ── 4. Cyan lift — screen, full frame ────────────────────────
-		ctx.globalCompositeOperation = "screen";
-		ctx.globalAlpha = Math.min(0.8, s.cyanDepth * 0.008);
-		ctx.fillStyle = "#00C8E0";
-		ctx.fillRect(0, 0, W, H);
-		ctx.globalAlpha = 1;
-		ctx.globalCompositeOperation = "source-over";
+		// ── 3. Cyan push — electric highlight screen layer ─────────────
+		{
+			const g = ctx.createRadialGradient(
+				W * 0.55,
+				H * 0.15,
+				0,
+				W * 0.55,
+				H * 0.15,
+				Math.max(W, H) * 0.8
+			);
+			g.addColorStop(
+				0,
+				`rgba(100,210,240,${Math.min(0.9, s.blueDepth * 0.008)})`
+			);
+			g.addColorStop(
+				0.45,
+				`rgba(60,160,210,${Math.min(0.7, s.blueDepth * 0.005)})`
+			);
+			g.addColorStop(1, "rgba(0,0,0,0)");
+			ctx.globalCompositeOperation = "screen";
+			ctx.globalAlpha = Math.min(0.75, s.blueDepth * 0.007);
+			ctx.fillStyle = g;
+			ctx.fillRect(0, 0, W, H);
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+		}
 
 		// ── 4. Light wash — architectural top-down gradient (screen) ──
 		{

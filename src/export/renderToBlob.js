@@ -227,63 +227,69 @@ export function renderToBlob(img, s) {
 		// Burned into the export only, not visible in live preview.
 		// Simulates the chemical date-stamp etched into integral film.
 		// ── 10. Polaroid imprint — date + ATOM wordmark ────────────────
+		// ── 10. Polaroid imprint — ATOM wordmark then date ─────────────
+		// Burned into export only. Mimics early 2000s digital camera
+		// date stamp — LCD character style, high contrast, etched into frame.
 		{
 			const base = Math.min(W, H);
-			const dateSize = Math.round(base * 0.028);
-			const markSize = Math.round(base * 0.018);
-			const pad = Math.round(base * 0.04);
+			const dateSize = Math.round(base * 0.032); // slightly chunkier for LCD feel
+			const markSize = Math.round(base * 0.022);
+			const padX = Math.round(base * 0.035); // distance from right edge
+			const padY = Math.round(base * 0.2); // distance from bottom — adjust to taste
 
 			const now = new Date();
-			const month = now
-				.toLocaleString("en-US", { month: "short" })
-				.toUpperCase();
-			const year = now.getFullYear();
+			const yyyy = now.getFullYear();
+			const mm = String(now.getMonth() + 1).padStart(2, "0");
+			const dateStr = `${yyyy}/${mm}`; // e.g. 2025/03 — matches digital camera format
 
-			// Save context state before rotating
 			ctx.save();
 
-			// ── Translate to bottom-right, rotate -90° so text reads upward ──
-			// After rotation: x axis points up, y axis points left.
-			// We position at (W - pad, H - pad) then write "upward" along the right edge.
-			ctx.translate(W - pad, H - pad);
+			// Translate to right edge at chosen height, rotate so text reads upward
+			ctx.translate(W - padX, H - padY);
 			ctx.rotate(-Math.PI / 2);
 
-			ctx.globalCompositeOperation = "multiply";
 			ctx.textBaseline = "bottom";
 
-			// ── Date line: "MON YEAR" — right-aligned to the bottom of the rotated axis ──
-			// After -90° rotation, textAlign 'right' anchors to the bottom of the image.
-			ctx.font = `bold ${dateSize}px 'Courier New', Courier, monospace`;
+			// ── Both lines anchored right — reads upward from bottom ──────
+			// After -90° rotation: right = toward bottom of image, left = toward top.
+			// 'right' at x=0 means both lines end flush at the same point,
+			// stacked cleanly with the gap between them.
 			ctx.textAlign = "right";
 
-			// Primary pass — warm amber chemical ink
-			ctx.globalAlpha = 0.55;
+			// Measure date width so the wordmark matches the same anchor point
+			ctx.font = `bold ${dateSize}px 'Courier New', Courier, monospace`;
+			const dateWidth = ctx.measureText(dateStr).width;
+			const lineGap = Math.round(base * 0.004); // tight gap between ATOM and date
+
+			// ── Line 1: ATOM wordmark (sits above date, toward top of image) ──
+			const markY = -(dateWidth + lineGap); // negative = further left in rotated space = higher up image
+
+			ctx.font = `bold ${markSize}px 'Courier New', Courier, monospace`;
+			ctx.globalCompositeOperation = "source-over";
+
+			// Warm amber primary — high contrast LCD feel
+			ctx.globalAlpha = 0.82;
 			ctx.fillStyle = "rgba(210, 120, 40, 1)";
-			ctx.fillText(`${month} ${year}`, 0, 0);
+			ctx.fillText("AT\u25CBM", markY, 0);
 
-			// Shadow pass — etched bleed
-			ctx.globalAlpha = 0.18;
-			ctx.fillStyle = "rgba(180, 80, 20, 1)";
-			ctx.fillText(`${month} ${year}`, 1, 1);
+			// Slight glow pass underneath for the LCD bloom effect
+			ctx.globalAlpha = 0.22;
+			ctx.fillStyle = "rgba(255, 180, 60, 1)";
+			ctx.fillText("AT\u25CBM", markY - 1, -1);
 
-			// ── AT○M wordmark — left-aligned, sits near the top of the image ──
-			// After -90° rotation, textAlign 'left' anchors toward the top of the image.
-			// Offset along the rotated x axis (which is now pointing up the image)
-			// so it sits separated from the date, near the top-right corner.
-			ctx.font = `${markSize}px 'Courier New', Courier, monospace`;
-			ctx.textAlign = "left";
+			// ── Line 2: Date (sits below wordmark, toward bottom of image) ──
+			ctx.font = `bold ${dateSize}px 'Courier New', Courier, monospace`;
 
-			const wordmarkOffset = Math.round(base * 0.72);
-
-			ctx.globalAlpha = 0.38;
+			// Primary — warm amber, solid
+			ctx.globalAlpha = 0.88;
 			ctx.fillStyle = "rgba(210, 120, 40, 1)";
-			ctx.fillText("AT\u25CBM", wordmarkOffset, 0);
+			ctx.fillText(dateStr, 0, 0);
 
-			ctx.globalAlpha = 0.14;
-			ctx.fillStyle = "rgba(180, 80, 20, 1)";
-			ctx.fillText("AT\u25CBM", wordmarkOffset + 1, 1);
+			// Glow pass
+			ctx.globalAlpha = 0.25;
+			ctx.fillStyle = "rgba(255, 180, 60, 1)";
+			ctx.fillText(dateStr, -1, -1);
 
-			// Restore context — removes the rotation transform
 			ctx.restore();
 			ctx.globalAlpha = 1;
 			ctx.globalCompositeOperation = "source-over";

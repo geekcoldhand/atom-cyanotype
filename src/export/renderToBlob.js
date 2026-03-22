@@ -226,7 +226,7 @@ export function renderToBlob(img, s) {
 		// ── 10. Polaroid imprint — date + ATOM wordmark ────────────────
 		// Burned into the export only, not visible in live preview.
 		// Simulates the chemical date-stamp etched into integral film.
-
+		// ── 10. Polaroid imprint — date + ATOM wordmark ────────────────
 		{
 			const base = Math.min(W, H);
 			const dateSize = Math.round(base * 0.028);

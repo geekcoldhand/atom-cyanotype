@@ -8,3 +8,9 @@
   min-height: 240px;
   max-height: 46vh;
 }
+
+.controls.collapsed {
+  min-height: 0;
+  max-height: var(--tab-h);  /* 50px — exactly the tab bar */
+  overflow: hidden;
+}

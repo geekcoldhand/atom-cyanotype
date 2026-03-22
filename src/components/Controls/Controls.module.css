@@ -1,21 +1,10 @@
 .controls {
   flex: 0 0 auto;
-  background: rgba(17, 38, 60, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(0, 212, 255, 0.15);
+  background: var(--c-panel);
+  border-top: 1px solid var(--c-border);
   display: flex;
   flex-direction: column;
+  /* Minimum height ensures sliders are always comfortably reachable */
   min-height: 240px;
   max-height: 46vh;
-  transition: min-height 0.25s ease, max-height 0.25s ease;
-  position: relative;
-  bottom: 3rem;
-}
-
-/* Collapsed — shrinks to just the tab bar height, sliders hidden */
-.controls.collapsed {
-  min-height: 0;
-  max-height: var(--tab-h);  /* 50px — exactly the tab bar */
-  overflow: hidden;
 }

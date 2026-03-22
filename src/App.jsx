@@ -1,86 +1,85 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback } from 'react'
 
-import { Header } from "./components/Header/Header.jsx";
-import { Preview } from "./components/Preview/Preview.jsx";
-import { Controls } from "./components/Controls/Controls.jsx";
-import { ProcessingOverlay } from "./components/ProcessingOverlay/ProcessingOverlay.jsx";
+import { Header }            from './components/Header/Header.jsx'
+import { Preview }           from './components/Preview/Preview.jsx'
+import { Controls }          from './components/Controls/Controls.jsx'
+import { ProcessingOverlay } from './components/ProcessingOverlay/ProcessingOverlay.jsx'
 
-import { useControls } from "./hooks/useControls.js";
-import { useDustCanvas } from "./hooks/useDustCanvas.js";
+import { useControls }   from './hooks/useControls.js'
+import { useDustCanvas } from './hooks/useDustCanvas.js'
 
-import { renderToBlob } from "./export/renderToBlob.js";
-import { saveBlob } from "./export/saveBlob.js";
+import { renderToBlob } from './export/renderToBlob.js'
+import { saveBlob }     from './export/saveBlob.js'
 
-import styles from "./App.module.css";
+import styles from './App.module.css'
 
 export default function App() {
-	const [imgSrc, setImgSrc] = useState(null);
-	const [processing, setProcessing] = useState(false);
-	const [controlsVisible, setControlsVisible] = useState(true);
+  const [imgSrc,     setImgSrc]     = useState(null)
+  const [processing, setProcessing] = useState(false)
 
-	const { controls, setControl } = useControls();
-	const { canvasRef, imgRef, initDust } = useDustCanvas(0, !!imgSrc);
+  const { controls, setControl } = useControls()
 
-	const handleFile = useCallback((file) => {
-		if (!file || !file.type.startsWith("image/")) return;
-		setImgSrc((prev) => {
-			if (prev) URL.revokeObjectURL(prev);
-			return URL.createObjectURL(file);
-		});
-	}, []);
+  // Dust canvas hook — no-op in Y2K aesthetic, kept for structural compatibility
+  const { canvasRef, imgRef, initDust } = useDustCanvas(0, !!imgSrc)
 
-	const handleImageLoad = useCallback(() => {
-		initDust();
-	}, [initDust]);
+  // ── File loading ────────────────────────────────────────────────
+  const handleFile = useCallback((file) => {
+    if (!file || !file.type.startsWith('image/')) return
+    // Revoke previous object URL to avoid memory leaks
+    setImgSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
+  }, [])
 
-	// Tap on preview image toggles controls — only when an image is loaded
-	const handlePreviewTap = useCallback(() => {
-		if (imgSrc) setControlsVisible((v) => !v);
-	}, [imgSrc]);
+  // Called when the <img> fires onLoad — sizes & paints the dust canvas
+  const handleImageLoad = useCallback(() => {
+    initDust()
+  }, [initDust])
 
-	// Tapping any tab always shows controls
-	const handleTabChange = useCallback(() => {
-		setControlsVisible(true);
-	}, []);
+  // ── Export ──────────────────────────────────────────────────────
+  const handleSave = useCallback(async () => {
+    const img = imgRef.current
+    if (!img) return
 
-	const handleSave = useCallback(async () => {
-		const img = imgRef.current;
-		if (!img) return;
-		setProcessing(true);
-		await new Promise((r) => setTimeout(r, 80));
-		try {
-			const blob = await renderToBlob(img, controls);
-			await saveBlob(blob);
-		} catch (err) {
-			console.error("Export failed:", err);
-			alert("Export failed: " + err.message);
-		}
-		setProcessing(false);
-	}, [controls, imgRef]);
+    setProcessing(true)
+    // Yield one frame so the processing overlay can paint
+    await new Promise((r) => setTimeout(r, 80))
 
-	return (
-		<div className={styles.app}>
-			<Header hasImage={!!imgSrc} processing={processing} onSave={handleSave} />
+    try {
+      const blob = await renderToBlob(img, controls)
+      await saveBlob(blob)
+    } catch (err) {
+      console.error('Export failed:', err)
+      alert('Export failed: ' + err.message)
+    }
 
-			<Preview
-				imgSrc={imgSrc}
-				controls={controls}
-				imgRef={imgRef}
-				canvasRef={canvasRef}
-				onFile={handleFile}
-				onImageLoad={handleImageLoad}
-				onPreviewTap={handlePreviewTap}
-				controlsVisible={controlsVisible}
-			/>
+    setProcessing(false)
+  }, [controls, imgRef])
 
-			<Controls
-				controls={controls}
-				setControl={setControl}
-				visible={controlsVisible}
-				onTabChange={handleTabChange}
-			/>
+  return (
+    <div className={styles.app}>
+      <Header
+        hasImage={!!imgSrc}
+        processing={processing}
+        onSave={handleSave}
+      />
 
-			<ProcessingOverlay visible={processing} />
-		</div>
-	);
+      <Preview
+        imgSrc={imgSrc}
+        controls={controls}
+        imgRef={imgRef}
+        canvasRef={canvasRef}
+        onFile={handleFile}
+        onImageLoad={handleImageLoad}
+      />
+
+      <Controls
+        controls={controls}
+        setControl={setControl}
+      />
+
+      <ProcessingOverlay visible={processing} />
+    </div>
+  )
 }

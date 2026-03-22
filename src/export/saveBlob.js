@@ -2,36 +2,35 @@
  * Saves a blob to the user's device.
  *
  * On iOS / Android: invokes the native share sheet via navigator.share({ files })
- * which lets the user save to Photos, Files, or any app.
+ * so the user can save to Photos, Files, or any app.
  *
  * On desktop: triggers a direct <a> download.
  *
- * @param {Blob}   blob
- * @param {string} [filename='atom-cyanotype.jpg']
+ * IMPORTANT: must be called with no artificial delays (no setTimeout) between
+ * the user tap and this call — iOS Safari enforces that navigator.share() is
+ * invoked within the same user-gesture call stack as the originating tap.
  */
+
 /**
- * Returns true only on genuine touch-primary mobile devices.
- * navigator.canShare exists on macOS Safari too, so we cannot
- * use it alone — we need a secondary touch signal.
+ * Detects a genuine touch-primary mobile device using maxTouchPoints only.
+ * No userAgent sniffing — UA strings are unreliable on modern iOS/Android
+ * and break for iPad in desktop-browsing mode.
+ *
+ * Desktop Mac:   maxTouchPoints === 0
+ * iOS / Android: maxTouchPoints >= 5
+ * Threshold >=2  catches all real touch devices while excluding all mice.
  */
 function isMobileDevice() {
-  // maxTouchPoints > 1 is the most reliable cross-browser signal.
-  // A mouse-only Mac always reports 0; iOS/Android report 5+.
-  return (
-    typeof navigator !== 'undefined' &&
-    navigator.maxTouchPoints > 1 &&
-    /android|iphone|ipad|ipod/i.test(navigator.userAgent)
-  )
+  return typeof navigator !== 'undefined' && navigator.maxTouchPoints >= 2
 }
 
 export async function saveBlob(blob, filename = 'atom-cyanotype.jpg') {
   const file = new File([blob], filename, { type: 'image/jpeg' })
 
   // Mobile share sheet — iOS Safari / Android Chrome only.
-  // Explicitly excluded: macOS Safari, macOS Chrome, desktop browsers
-  // that implement navigator.share but should still download directly.
   if (
     isMobileDevice() &&
+    typeof navigator.share    === 'function' &&
     typeof navigator.canShare === 'function' &&
     navigator.canShare({ files: [file] })
   ) {
@@ -39,12 +38,14 @@ export async function saveBlob(blob, filename = 'atom-cyanotype.jpg') {
       await navigator.share({ files: [file], title: 'ATOM — Cyanotype Film' })
       return
     } catch (err) {
-      // User cancelled share or share failed — fall through to download
-      if (err.name !== 'AbortError') console.warn('Share failed:', err)
+      // AbortError = user dismissed the sheet. Not an error — just return.
+      if (err.name === 'AbortError') return
+      // Any other error falls through to the download fallback.
+      console.warn('navigator.share failed, falling back to download:', err)
     }
   }
 
-  // Desktop + fallback: direct <a> download
+  // Desktop + fallback: programmatic <a> download
   const url = URL.createObjectURL(blob)
   const a   = document.createElement('a')
   a.href     = url

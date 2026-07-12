@@ -1,19 +1,11 @@
 import { FilterStack } from "./FilterStack.jsx";
 import { UploadZone } from "./UploadZone.jsx";
 import styles from "./Preview.module.css";
+import { useRef } from "react";
 
-export function Preview({
-	imgSrc,
-	controls,
-	imgRef,
-	canvasRef,
-	onFile,
-	onImageLoad,
-	onPreviewTap,
-	controlsVisible,
-}) {
+export function Preview({ previewRef, imgSrc, controls, imgRef, canvasRef }) {
+	const previewRef = useRef(null);
 	const handleDragOver = (e) => e.preventDefault();
-
 	const handleDrop = (e) => {
 		e.preventDefault();
 		const file = e.dataTransfer.files[0];
@@ -32,6 +24,7 @@ export function Preview({
 				// Tap anywhere on the image/preview to toggle controls
 				<div className={styles.tapTarget} onClick={onPreviewTap}>
 					<FilterStack
+						previewRef={previewRef}
 						imgSrc={imgSrc}
 						controls={controls}
 						imgRef={imgRef}

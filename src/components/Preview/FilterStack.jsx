@@ -12,7 +12,14 @@ import styles from "./FilterStack.module.css";
  * Control keys: blueDepth, tealDepth, cyanDepth, exposure, highlightLift,
  *   shadowLift, midtoneContrast, contrastSoft, grain, lightWash, reflection
  */
-export function FilterStack({ imgSrc, controls, imgRef, canvasRef, onLoad }) {
+export function FilterStack({
+	imgSrc,
+	controls,
+	imgRef,
+	canvasRef,
+	onLoad,
+	previewRef,
+}) {
 	const {
 		blueDepth,
 		tealDepth,
@@ -126,7 +133,8 @@ export function FilterStack({ imgSrc, controls, imgRef, canvasRef, onLoad }) {
 	)}/${now.getFullYear()}`;
 
 	return (
-		<div className={styles.root}>
+		// <div className={styles.root}>
+		<div ref={previewRef} className={styles.root}>
 			<img
 				ref={imgRef}
 				src={imgSrc}

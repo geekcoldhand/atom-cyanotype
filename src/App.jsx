@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 
 import { Header } from "./components/Header/Header.jsx";
 import { Preview } from "./components/Preview/Preview.jsx";
@@ -20,7 +20,7 @@ export default function App() {
 
 	const { controls, setControl } = useControls();
 	const { canvasRef, imgRef, initDust } = useDustCanvas(0, !!imgSrc);
-
+	const previewRef = useRef(null);
 	const handleFile = useCallback((file) => {
 		if (!file || !file.type.startsWith("image/")) return;
 		setImgSrc((prev) => {
@@ -44,8 +44,8 @@ export default function App() {
 	}, []);
 
 	const handleSave = useCallback(async () => {
-		const img = imgRef.current;
-		if (!img) return;
+		const preview = previewRef.current;
+		if (!preview) return;
 		setProcessing(true);
 		await new Promise((r) => setTimeout(r, 80));
 		try {
@@ -56,13 +56,14 @@ export default function App() {
 			alert("Export failed: " + err.message);
 		}
 		setProcessing(false);
-	}, [controls, imgRef]);
+	}, [imgRef]);
 
 	return (
 		<div className={styles.app}>
 			<Header hasImage={!!imgSrc} processing={processing} onSave={handleSave} />
 
 			<Preview
+				previewRef={previewRef}
 				imgSrc={imgSrc}
 				controls={controls}
 				imgRef={imgRef}

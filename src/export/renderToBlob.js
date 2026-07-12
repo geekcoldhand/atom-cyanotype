@@ -223,76 +223,43 @@ export function renderToBlob(img, s) {
 			ctx.globalCompositeOperation = "source-over";
 		}
 
-		// ── 10. Polaroid imprint — date + ATOM wordmark ────────────────
-		// Burned into the export only, not visible in live preview.
-		// Simulates the chemical date-stamp etched into integral film.
-		// ── 10. Polaroid imprint — date + ATOM wordmark ────────────────
-		// ── 10. Polaroid imprint — ATOM wordmark then date ─────────────
-		// Burned into export only. Mimics early 2000s digital camera
-		// date stamp — LCD character style, high contrast, etched into frame.
 		{
-			const base = Math.min(W, H);
-			const dateSize = Math.round(base * 0.032); // slightly chunkier for LCD feel
-			const markSize = Math.round(base * 0.022);
-			const padX = Math.round(base * 0.035); // distance from right edge
-			const padY = Math.round(base * 0.2); // distance from bottom — adjust to taste
+			// ── 10. Polaroid imprint ─────────────────────────────────────────
+			{
+				const base = Math.min(W, H);
 
-			const now = new Date();
-			const yyyy = now.getFullYear();
-			const mm = String(now.getMonth() + 1).padStart(2, "0");
-			const dateStr = `${yyyy}/${mm}`; // e.g. 2025/03 — matches digital camera format
+				const dateSize = Math.round(base * 0.022);
+				const markSize = Math.round(base * 0.032);
 
-			ctx.save();
+				const padX = Math.round(base * 0.035);
+				const padY = Math.round(base * 0.6);
 
-			// Translate to right edge at chosen height, rotate so text reads upward
-			ctx.translate(W - padX, H - padY);
-			ctx.rotate(-Math.PI / 2);
+				const lineGap = Math.round(base * 0.06); // gap between ATOM and date
 
-			ctx.textBaseline = "bottom";
+				const now = new Date();
+				const yyyy = now.getFullYear();
+				const mm = String(now.getMonth() + 1).padStart(2, "0");
+				const dateStr = `${mm}/${yyyy}`;
 
-			// ── Both lines anchored right — reads upward from bottom ──────
-			// After -90° rotation: right = toward bottom of image, left = toward top.
-			// 'right' at x=0 means both lines end flush at the same point,
-			// stacked cleanly with the gap between them.
-			ctx.textAlign = "right";
+				ctx.save();
 
-			// Measure date width so the wordmark matches the same anchor point
-			ctx.font = `bold ${dateSize}px 'Courier New', Courier, monospace`;
-			const dateWidth = ctx.measureText(dateStr).width;
-			const lineGap = Math.round(base * 0.004); // tight gap between ATOM and date
+				ctx.translate(W - padX, H - padY);
+				ctx.rotate(Math.PI / 2);
 
-			// ── Line 1: ATOM wordmark (sits above date, toward top of image) ──
-			const markY = -(dateWidth + lineGap); // negative = further left in rotated space = higher up image
+				ctx.textAlign = "right";
+				ctx.textBaseline = "bottom";
+				ctx.fillStyle = "#865d39";
 
-			ctx.font = `bold ${markSize}px 'Courier New', Courier, monospace`;
-			ctx.globalCompositeOperation = "source-over";
+				// ATOM
+				ctx.font = `bold ${markSize}px 'Courier New', Courier, monospace`;
+				ctx.fillText("AT\u25CBM", 0, -lineGap);
 
-			// Warm amber primary — high contrast LCD feel
-			ctx.globalAlpha = 0.82;
-			ctx.fillStyle = "rgba(210, 120, 40, 1)";
-			ctx.fillText("AT\u25CBM", markY, 0);
+				// Date
+				ctx.font = `bold ${dateSize}px 'Courier New', Courier, monospace`;
+				ctx.fillText(dateStr, 0, 0);
 
-			// Slight glow pass underneath for the LCD bloom effect
-			ctx.globalAlpha = 0.22;
-			ctx.fillStyle = "rgba(255, 180, 60, 1)";
-			ctx.fillText("AT\u25CBM", markY - 1, -1);
-
-			// ── Line 2: Date (sits below wordmark, toward bottom of image) ──
-			ctx.font = `bold ${dateSize}px 'Courier New', Courier, monospace`;
-
-			// Primary — warm amber, solid
-			ctx.globalAlpha = 0.88;
-			ctx.fillStyle = "rgba(210, 120, 40, 1)";
-			ctx.fillText(dateStr, 0, 0);
-
-			// Glow pass
-			ctx.globalAlpha = 0.25;
-			ctx.fillStyle = "rgba(255, 180, 60, 1)";
-			ctx.fillText(dateStr, -1, -1);
-
-			ctx.restore();
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "source-over";
+				ctx.restore();
+			}
 		}
 
 		// ── Export ────────────────────────────────────────────────────

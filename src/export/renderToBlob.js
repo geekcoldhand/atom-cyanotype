@@ -1,284 +1,619 @@
 /**
- * Replicates all CSS filter layers onto an offscreen canvas at full natural
- * image resolution, then exports as a JPEG blob.
- *
- * Layer order mirrors FilterStack.jsx exactly:
- *   1. base image (CSS filter equiv)
- *   2. blueBase    — navy multiply            (blueDepth)
- *   3. tealGrade   — teal color + screen      (tealDepth)
- *   4. cyanLift    — cyan screen              (cyanDepth)
- *   5. lightWash   — top-down linear screen   (lightWash)
- *   6. highlightLift — top radial screen      (highlightLift)
- *   7. reflection  — diagonal overlay         (reflection)
- *   8. grain       — noise overlay            (grain)
- *   9. shadowControl — edge multiply          (shadowLift)
- *
- * @param {HTMLImageElement} img
- * @param {object}           s    - controls from useControls()
- * @returns {Promise<Blob>}
+ * Canvas-based export that replicates FilterStack exactly
+ * All filters and overlays are applied using canvas operations
  */
-export function renderToBlob(img, s) {
+
+// Helper to convert blob URL to data URL
+const blobURLToDataURL = async (blobURL) => {
+	try {
+		const response = await fetch(blobURL);
+		if (!response.ok) {
+			throw new Error(`Failed to fetch blob: ${response.status}`);
+		}
+		const blob = await response.blob();
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = (e) => resolve(e.target.result);
+			reader.onerror = (e) =>
+				reject(new Error("Failed to read blob as data URL"));
+			reader.readAsDataURL(blob);
+		});
+	} catch (error) {
+		console.error("Error converting blob URL to data URL:", error);
+		throw error;
+	}
+};
+
+// Helper to load image from data URL
+const loadImage = (src) => {
 	return new Promise((resolve, reject) => {
-		const naturalW = img.naturalWidth;
-		const naturalH = img.naturalHeight;
+		const img = new Image();
+		img.crossOrigin = "anonymous";
+		img.onload = () => resolve(img);
+		img.onerror = () => reject(new Error(`Failed to load image`));
+		img.src = src;
+	});
+};
 
-		// ── Mobile Safari canvas size guard ───────────────────────────
-		// iOS Safari silently returns null from toBlob when the canvas
-		// pixel count exceeds ~16.7MP (4096×4096). We scale down to fit
-		// within a safe limit while preserving aspect ratio.
-		const MAX_PIXELS = 16_000_000;
-		let W = naturalW;
-		let H = naturalH;
-		if (W * H > MAX_PIXELS) {
-			const scale = Math.sqrt(MAX_PIXELS / (W * H));
-			W = Math.floor(W * scale);
-			H = Math.floor(H * scale);
+// ── GRAIN_SVG from constants ──────────────────────────────────────
+// This should match your GRAIN_SVG constant
+const GRAIN_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E`;
+
+export async function renderToBlob({
+	imgSrc,
+	controls,
+	naturalWidth,
+	naturalHeight,
+}) {
+	console.log("🎨 Starting canvas-based export with FilterStack filters...");
+	console.log("📊 Controls:", controls);
+
+	// ── 1. Get image as data URL ──────────────────────────────────
+	let imageSource = imgSrc;
+	if (imgSrc && imgSrc.startsWith("blob:")) {
+		try {
+			imageSource = await blobURLToDataURL(imgSrc);
+			console.log("✅ Converted blob URL to data URL");
+		} catch (error) {
+			console.error("❌ Failed to convert blob URL:", error);
+			throw new Error("Failed to load image for export");
 		}
+	}
 
-		const canvas = document.createElement("canvas");
-		canvas.width = W;
-		canvas.height = H;
-		const ctx = canvas.getContext("2d");
+	// ── 2. Load the image ──────────────────────────────────────────
+	let img;
+	try {
+		img = await loadImage(imageSource);
+		console.log("✅ Image loaded:", img.width, "x", img.height);
+	} catch (error) {
+		console.error("❌ Failed to load image:", error);
+		throw new Error("Failed to load image for export");
+	}
 
-		if (!ctx) {
-			reject(new Error("Could not get 2D canvas context"));
-			return;
-		}
+	// ── 3. Create main canvas ──────────────────────────────────────
+	const canvas = document.createElement("canvas");
+	canvas.width = naturalWidth;
+	canvas.height = naturalHeight;
+	const ctx = canvas.getContext("2d");
 
-		// Destructure with fallbacks matching DEFAULTS in controls.js.
-		// Every key gets a fallback so a missing/renamed key never produces NaN.
-		const blueDepth = s.blueDepth ?? 40;
-		const tealDepth = s.tealDepth ?? 30;
-		const cyanDepth = s.cyanDepth ?? 25;
-		const exposure = s.exposure ?? 30;
-		const highlightLift = s.highlightLift ?? 20;
-		const shadowLift = s.shadowLift ?? 15;
-		const midtoneContrast = s.midtoneContrast ?? 20;
-		const contrastSoft = s.contrastSoft ?? -10;
-		const grain = s.grain ?? 25;
-		const lightWash = s.lightWash ?? 40;
-		const reflection = s.reflection ?? 25;
+	// ── 4. Apply all filters from controls ────────────────────────
 
-		// ── 1. Base image — tonal filter ──────────────────────────────
-		const contrastVal = Math.max(
-			0.5,
-			1 + midtoneContrast * 0.006 + contrastSoft * 0.004
+	// 4.1 Draw the original image
+	ctx.drawImage(img, 0, 0, naturalWidth, naturalHeight);
+	console.log("✅ Base image drawn");
+
+	// 4.2 Extract control values (matching FilterStack)
+	const {
+		blueDepth = 0,
+		tealDepth = 0,
+		cyanDepth = 0,
+		exposure = 0,
+		highlightLift = 0,
+		shadowLift = 0,
+		midtoneContrast = 0,
+		contrastSoft = 0,
+		grain = 0,
+		lightWash = 0,
+		reflection = 0,
+	} = controls;
+
+	// 4.3 Apply base image CSS filters (contrast, brightness, saturation)
+	const contrastVal = Math.max(
+		0.5,
+		1 + midtoneContrast * 0.006 + contrastSoft * 0.004
+	);
+	const brightnessVal = Math.max(
+		0.5,
+		1 + exposure * 0.008 + shadowLift * 0.004
+	);
+	const saturateVal = Math.max(0, 0.6 + blueDepth * 0.006);
+
+	if (contrastVal !== 1) {
+		applyContrast(ctx, contrastVal, 0, 0, naturalWidth, naturalHeight);
+		console.log("✅ Applied contrast:", contrastVal);
+	}
+
+	if (brightnessVal !== 1) {
+		applyBrightness(ctx, brightnessVal, 0, 0, naturalWidth, naturalHeight);
+		console.log("✅ Applied brightness:", brightnessVal);
+	}
+
+	if (saturateVal !== 1) {
+		applySaturation(ctx, saturateVal, 0, 0, naturalWidth, naturalHeight);
+		console.log("✅ Applied saturation:", saturateVal);
+	}
+
+	// 4.4 Apply blueBase overlay (multiply blend mode)
+	if (blueDepth > 0) {
+		const opacity = Math.min(0.9, blueDepth * 0.009);
+		applyColorOverlay(
+			ctx,
+			"#0D2B6B",
+			opacity,
+			"multiply",
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
 		);
-		const brightnessVal = Math.max(
-			0.5,
-			1 + exposure * 0.008 + shadowLift * 0.004
+		console.log("✅ Applied blueBase:", opacity);
+	}
+
+	// 4.5 Apply tealGrade overlay (color blend mode)
+	if (tealDepth > 0) {
+		const opacity = Math.min(0.9, tealDepth * 0.009);
+		applyColorOverlay(
+			ctx,
+			"#5b848a",
+			opacity,
+			"color",
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
 		);
-		const saturateVal = Math.max(0, 0.6 + blueDepth * 0.006);
+		console.log("✅ Applied tealGrade:", opacity);
+	}
 
-		ctx.filter = `contrast(${contrastVal}) brightness(${brightnessVal}) saturate(${saturateVal})`;
-		ctx.drawImage(img, 0, 0, W, H);
-		ctx.filter = "none";
+	// 4.6 Apply cyanLift overlay (screen blend mode)
+	if (cyanDepth > 0) {
+		const opacity = Math.min(0.8, cyanDepth * 0.008);
+		applyColorOverlay(
+			ctx,
+			"#0e5398",
+			opacity,
+			"screen",
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
+		);
+		console.log("✅ Applied cyanLift:", opacity);
+	}
 
-		// ── 2. blueBase — deep navy multiply, full frame ───────────────
-		ctx.globalCompositeOperation = "multiply";
-		ctx.globalAlpha = Math.min(0.9, blueDepth * 0.009);
-		ctx.fillStyle = "#0D2B6B";
-		ctx.fillRect(0, 0, W, H);
-		ctx.globalAlpha = 1;
-		ctx.globalCompositeOperation = "source-over";
+	// 4.7 Apply lightWash (gradient with screen blend mode)
+	if (lightWash > 0) {
+		const opacity1 = Math.min(1, 0.2 + lightWash * 0.008);
+		const opacity2 = Math.min(1, 0.1 + lightWash * 0.006);
+		const opacity3 = Math.min(1, 0.02 + lightWash * 0.002);
+		const overallOpacity = Math.min(1, 0.3 + lightWash * 0.005);
 
-		// ── 3. tealGrade — teal color shift, full frame ────────────────
-		// Canvas 2D has no 'color' blend — approximate with multiply pass
-		// (shifts shadows toward teal) + screen pass (lifts midtones to teal).
-		{
-			ctx.globalCompositeOperation = "multiply";
-			ctx.globalAlpha = Math.min(0.6, tealDepth * 0.006);
-			ctx.fillStyle = "#0A7A8A";
-			ctx.fillRect(0, 0, W, H);
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "source-over";
-
-			ctx.globalCompositeOperation = "screen";
-			ctx.globalAlpha = Math.min(0.4, tealDepth * 0.004);
-			ctx.fillStyle = "#0A7A8A";
-			ctx.fillRect(0, 0, W, H);
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "source-over";
-		}
-
-		// ── 4. cyanLift — electric cyan screen, full frame ─────────────
-		ctx.globalCompositeOperation = "screen";
-		ctx.globalAlpha = Math.min(0.8, cyanDepth * 0.008);
-		ctx.fillStyle = "#00C8E0";
-		ctx.fillRect(0, 0, W, H);
-		ctx.globalAlpha = 1;
-		ctx.globalCompositeOperation = "source-over";
-
-		// ── 5. lightWash — top-down architectural gradient (screen) ───
-		{
-			const g = ctx.createLinearGradient(0, 0, 0, H);
-			g.addColorStop(
-				0,
-				`rgba(230,247,255,${Math.min(1, 0.2 + lightWash * 0.008)})`
-			);
-			g.addColorStop(
-				0.35,
-				`rgba(207,239,255,${Math.min(1, 0.1 + lightWash * 0.006)})`
-			);
-			g.addColorStop(
-				0.65,
-				`rgba(111,186,217,${Math.min(1, 0.02 + lightWash * 0.002)})`
-			);
-			g.addColorStop(1, "rgba(0,0,0,0)");
-			ctx.globalCompositeOperation = "screen";
-			ctx.globalAlpha = Math.min(1, 0.3 + lightWash * 0.005);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, W, H);
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "source-over";
-		}
-
-		// ── 6. highlightLift — top-of-frame radial screen ─────────────
-		{
-			const r = Math.max(W, H) * 0.6;
-			const g = ctx.createRadialGradient(W / 2, 0, 0, W / 2, 0, r);
-			g.addColorStop(
-				0,
-				`rgba(255,255,255,${Math.min(1, highlightLift * 0.012)})`
-			);
-			g.addColorStop(
-				0.5,
-				`rgba(207,239,255,${Math.min(1, highlightLift * 0.007)})`
-			);
-			g.addColorStop(1, "rgba(0,0,0,0)");
-			ctx.globalCompositeOperation = "screen";
-			ctx.globalAlpha = Math.min(1, 0.1 + highlightLift * 0.012);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, W, H);
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "source-over";
-		}
-
-		// ── 7. reflection — diagonal glass shimmer (overlay) ──────────
-		{
-			const g = ctx.createLinearGradient(0, 0, W, H);
-			g.addColorStop(
-				0,
-				`rgba(255,255,255,${Math.min(0.9, 0.05 + reflection * 0.006)})`
-			);
-			g.addColorStop(
-				0.5,
-				`rgba(207,239,255,${Math.min(0.9, 0.03 + reflection * 0.004)})`
-			);
-			g.addColorStop(
-				1,
-				`rgba(255,255,255,${Math.min(0.9, 0.04 + reflection * 0.005)})`
-			);
-			ctx.globalCompositeOperation = "overlay";
-			ctx.globalAlpha = Math.min(1, 0.1 + reflection * 0.007);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, W, H);
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "source-over";
-		}
-
-		// ── 8. grain — random noise overlay ───────────────────────────
-		// default 25 → opacity 0.225, above the ~0.08 overlay visibility threshold
-		{
-			const gc = document.createElement("canvas");
-			gc.width = W;
-			gc.height = H;
-			const gctx = gc.getContext("2d");
-			const id = gctx.createImageData(W, H);
-			for (let i = 0; i < id.data.length; i += 4) {
-				const v = (Math.random() * 255) | 0;
-				id.data[i] = v;
-				id.data[i + 1] = v;
-				id.data[i + 2] = v;
-				id.data[i + 3] = 255;
-			}
-			gctx.putImageData(id, 0, 0);
-			ctx.globalCompositeOperation = "overlay";
-			ctx.globalAlpha = Math.min(0.65, grain * 0.009);
-			ctx.drawImage(gc, 0, 0);
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "source-over";
-		}
-
-		// ── 9. shadowControl — edge vignette (multiply) ────────────────
-		{
-			const g = ctx.createRadialGradient(
-				W / 2,
-				H / 2,
-				Math.min(W, H) * 0.25,
-				W / 2,
-				H / 2,
-				Math.max(W, H) * 0.75
-			);
-			g.addColorStop(0, "rgba(0,0,0,0)");
-			g.addColorStop(
-				1,
-				`rgba(10,26,47,${Math.min(0.8, 0.05 + (100 - shadowLift) * 0.003)})`
-			);
-			ctx.globalCompositeOperation = "multiply";
-			ctx.globalAlpha = 0.7;
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, W, H);
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "source-over";
-		}
-
-		{
-			// ── 10. Polaroid imprint ─────────────────────────────────────────
+		applyGradientOverlay(
+			ctx,
 			{
-				const base = Math.min(W, H);
+				gradient: "linear",
+				colors: [
+					{ pos: 0, color: `rgba(230,247,255,${opacity1})` },
+					{ pos: 0.35, color: `rgba(207,239,255,${opacity2})` },
+					{ pos: 0.65, color: `rgba(111,186,217,${opacity3})` },
+					{ pos: 1, color: "rgba(255,255,255,0)" },
+				],
+				blendMode: "screen",
+				opacity: overallOpacity,
+			},
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
+		);
+		console.log("✅ Applied lightWash");
+	}
 
-				const dateSize = Math.round(base * 0.022);
-				const markSize = Math.round(base * 0.032);
+	// 4.8 Apply highlightLift (radial gradient with screen blend mode)
+	if (highlightLift > 0) {
+		const opacity1 = Math.min(1, highlightLift * 0.012);
+		const opacity2 = Math.min(1, highlightLift * 0.007);
+		const overallOpacity = Math.min(1, 0.1 + highlightLift * 0.012);
 
-				const padX = Math.round(base * 0.035);
-				const padY = Math.round(base * 0.6);
+		applyGradientOverlay(
+			ctx,
+			{
+				gradient: "radial",
+				colors: [
+					{ pos: 0, color: `rgba(255,255,255,${opacity1})` },
+					{ pos: 0.5, color: `rgba(207,239,255,${opacity2})` },
+					{ pos: 1, color: "rgba(255,255,255,0)" },
+				],
+				blendMode: "screen",
+				opacity: overallOpacity,
+			},
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
+		);
+		console.log("✅ Applied highlightLift");
+	}
 
-				const lineGap = Math.round(base * 0.06); // gap between ATOM and date
+	// 4.9 Apply reflection (gradient with overlay blend mode)
+	if (reflection > 0) {
+		const opacity1 = Math.min(0.9, 0.05 + reflection * 0.006);
+		const opacity2 = Math.min(0.9, 0.03 + reflection * 0.004);
+		const opacity3 = Math.min(0.9, 0.04 + reflection * 0.005);
+		const overallOpacity = Math.min(1, 0.1 + reflection * 0.007);
 
-				const now = new Date();
-				const yyyy = now.getFullYear();
-				const mm = String(now.getMonth() + 1).padStart(2, "0");
-				const dateStr = `${mm}/${yyyy}`;
+		applyGradientOverlay(
+			ctx,
+			{
+				gradient: "linear",
+				angle: 135,
+				colors: [
+					{ pos: 0, color: `rgba(255,255,255,${opacity1})` },
+					{ pos: 0.5, color: `rgba(207,239,255,${opacity2})` },
+					{ pos: 1, color: `rgba(255,255,255,${opacity3})` },
+				],
+				blendMode: "overlay",
+				opacity: overallOpacity,
+			},
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
+		);
+		console.log("✅ Applied reflection");
+	}
 
-				ctx.save();
+	// 4.10 Apply grain (overlay blend mode)
+	if (grain > 0) {
+		const grainOpacity = Math.min(0.65, grain * 0.009);
+		await applyGrainOverlay(
+			ctx,
+			grainOpacity,
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
+		);
+		console.log("✅ Applied grain:", grainOpacity);
+	}
 
-				ctx.translate(W - padX, H - padY);
-				ctx.rotate(Math.PI / 2);
+	// 4.11 Apply shadowControl (radial gradient with multiply blend mode)
+	const shadowOpacity = Math.min(0.8, 0.05 + (100 - shadowLift) * 0.003);
+	if (shadowOpacity > 0) {
+		applyGradientOverlay(
+			ctx,
+			{
+				gradient: "radial",
+				colors: [
+					{ pos: 0, color: "rgba(255,255,255,0)" },
+					{ pos: 0.25, color: "rgba(255,255,255,0)" },
+					{ pos: 1, color: `rgba(10,26,47,${shadowOpacity})` },
+				],
+				blendMode: "multiply",
+				opacity: 0.7,
+			},
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
+		);
+		console.log("✅ Applied shadowControl");
+	}
 
-				ctx.textAlign = "right";
-				ctx.textBaseline = "bottom";
-				ctx.fillStyle = "#865d39";
+	// 4.12 Add Polaroid stamp (text overlay)
+	const now = new Date();
+	const dateStr = `${String(now.getMonth() + 1).padStart(
+		2,
+		"0"
+	)}/${now.getFullYear()}`;
+	applyPolaroidStamp(ctx, dateStr, naturalWidth, naturalHeight);
+	console.log("✅ Applied Polaroid stamp");
 
-				// ATOM
-				ctx.font = `bold ${markSize}px 'Courier New', Courier, monospace`;
-				ctx.fillText("AT\u25CBM", 0, -lineGap);
-
-				// Date
-				ctx.font = `bold ${dateSize}px 'Courier New', Courier, monospace`;
-				ctx.fillText(dateStr, 0, 0);
-
-				ctx.restore();
-			}
-		}
-
-		// ── Export ────────────────────────────────────────────────────
-		// quality 0.92 — slightly reduced from 0.93 to stay under iOS
-		// memory limits on large images while remaining visually lossless.
+	// ── 5. Convert to blob ──────────────────────────────────────────
+	return new Promise((resolve, reject) => {
 		canvas.toBlob(
 			(blob) => {
 				if (blob) {
+					console.log("✅ Canvas exported, size:", blob.size, "bytes");
 					resolve(blob);
 				} else {
-					reject(
-						new Error(
-							"canvas.toBlob returned null — image may be too large for this device"
-						)
-					);
+					reject(new Error("Canvas toBlob returned null"));
 				}
 			},
 			"image/jpeg",
 			0.92
 		);
 	});
+}
+
+// ── Filter Implementation Functions ──────────────────────────────
+
+function applyBrightness(ctx, factor, x, y, width, height) {
+	const imageData = ctx.getImageData(x, y, width, height);
+	const data = imageData.data;
+
+	for (let i = 0; i < data.length; i += 4) {
+		data[i] = Math.min(255, Math.max(0, data[i] * factor));
+		data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * factor));
+		data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * factor));
+	}
+
+	ctx.putImageData(imageData, x, y);
+}
+
+function applyContrast(ctx, factor, x, y, width, height) {
+	const imageData = ctx.getImageData(x, y, width, height);
+	const data = imageData.data;
+
+	for (let i = 0; i < data.length; i += 4) {
+		data[i] = Math.min(
+			255,
+			Math.max(0, ((data[i] / 255 - 0.5) * factor + 0.5) * 255)
+		);
+		data[i + 1] = Math.min(
+			255,
+			Math.max(0, ((data[i + 1] / 255 - 0.5) * factor + 0.5) * 255)
+		);
+		data[i + 2] = Math.min(
+			255,
+			Math.max(0, ((data[i + 2] / 255 - 0.5) * factor + 0.5) * 255)
+		);
+	}
+
+	ctx.putImageData(imageData, x, y);
+}
+
+function applySaturation(ctx, factor, x, y, width, height) {
+	const imageData = ctx.getImageData(x, y, width, height);
+	const data = imageData.data;
+
+	for (let i = 0; i < data.length; i += 4) {
+		const r = data[i];
+		const g = data[i + 1];
+		const b = data[i + 2];
+		const gray = 0.2989 * r + 0.587 * g + 0.114 * b;
+
+		data[i] = Math.min(255, Math.max(0, gray + (r - gray) * factor));
+		data[i + 1] = Math.min(255, Math.max(0, gray + (g - gray) * factor));
+		data[i + 2] = Math.min(255, Math.max(0, gray + (b - gray) * factor));
+	}
+
+	ctx.putImageData(imageData, x, y);
+}
+
+function applyColorOverlay(
+	ctx,
+	color,
+	opacity,
+	blendMode,
+	x,
+	y,
+	width,
+	height
+) {
+	const imageData = ctx.getImageData(x, y, width, height);
+	const data = imageData.data;
+
+	// Parse color
+	const hex = color.replace("#", "");
+	const overlayR = parseInt(hex.substring(0, 2), 16);
+	const overlayG = parseInt(hex.substring(2, 4), 16);
+	const overlayB = parseInt(hex.substring(4, 6), 16);
+
+	for (let i = 0; i < data.length; i += 4) {
+		const r = data[i];
+		const g = data[i + 1];
+		const b = data[i + 2];
+
+		let resultR, resultG, resultB;
+
+		switch (blendMode) {
+			case "multiply":
+				resultR = (r / 255) * (overlayR / 255) * 255;
+				resultG = (g / 255) * (overlayG / 255) * 255;
+				resultB = (b / 255) * (overlayB / 255) * 255;
+				break;
+			case "screen":
+				resultR = 255 - ((255 - r) * (255 - overlayR)) / 255;
+				resultG = 255 - ((255 - g) * (255 - overlayG)) / 255;
+				resultB = 255 - ((255 - b) * (255 - overlayB)) / 255;
+				break;
+			case "color":
+				// Color blend mode - keep luminance, use overlay hue/saturation
+				const luminance = 0.2989 * r + 0.587 * g + 0.114 * b;
+				resultR = luminance * (overlayR / 255);
+				resultG = luminance * (overlayG / 255);
+				resultB = luminance * (overlayB / 255);
+				break;
+			default:
+				resultR = r;
+				resultG = g;
+				resultB = b;
+		}
+
+		data[i] = Math.min(255, Math.max(0, r + (resultR - r) * opacity));
+		data[i + 1] = Math.min(255, Math.max(0, g + (resultG - g) * opacity));
+		data[i + 2] = Math.min(255, Math.max(0, b + (resultB - b) * opacity));
+	}
+
+	ctx.putImageData(imageData, x, y);
+}
+
+function applyGradientOverlay(ctx, config, x, y, width, height) {
+	const imageData = ctx.getImageData(x, y, width, height);
+	const data = imageData.data;
+
+	// Create a temporary canvas for the gradient
+	const tempCanvas = document.createElement("canvas");
+	tempCanvas.width = width;
+	tempCanvas.height = height;
+	const tempCtx = tempCanvas.getContext("2d");
+
+	// Create the gradient
+	let gradient;
+	const centerX = width / 2;
+	const centerY = height / 2;
+	const radius = Math.max(width, height) * 0.7;
+
+	if (config.gradient === "linear") {
+		const angle = ((config.angle || 90) * Math.PI) / 180;
+		const x1 = centerX - Math.cos(angle) * radius;
+		const y1 = centerY - Math.sin(angle) * radius;
+		const x2 = centerX + Math.cos(angle) * radius;
+		const y2 = centerY + Math.sin(angle) * radius;
+		gradient = tempCtx.createLinearGradient(x1, y1, x2, y2);
+	} else {
+		gradient = tempCtx.createRadialGradient(
+			centerX,
+			centerY,
+			0,
+			centerX,
+			centerY,
+			radius
+		);
+	}
+
+	config.colors.forEach((c) => {
+		gradient.addColorStop(c.pos, c.color);
+	});
+
+	tempCtx.fillStyle = gradient;
+	tempCtx.fillRect(0, 0, width, height);
+
+	// Get gradient pixel data
+	const gradData = tempCtx.getImageData(0, 0, width, height).data;
+
+	// Apply blend mode
+	for (let i = 0; i < data.length; i += 4) {
+		const r = data[i];
+		const g = data[i + 1];
+		const b = data[i + 2];
+		const gr = gradData[i];
+		const gg = gradData[i + 1];
+		const gb = gradData[i + 2];
+		const ga = gradData[i + 3] / 255;
+
+		let resultR, resultG, resultB;
+		const opacity = config.opacity * ga;
+
+		switch (config.blendMode) {
+			case "multiply":
+				resultR = (r / 255) * (gr / 255) * 255;
+				resultG = (g / 255) * (gg / 255) * 255;
+				resultB = (b / 255) * (gb / 255) * 255;
+				break;
+			case "screen":
+				resultR = 255 - ((255 - r) * (255 - gr)) / 255;
+				resultG = 255 - ((255 - g) * (255 - gg)) / 255;
+				resultB = 255 - ((255 - b) * (255 - gb)) / 255;
+				break;
+			case "overlay":
+				resultR =
+					r < 128
+						? (2 * r * gr) / 255
+						: 255 - (2 * (255 - r) * (255 - gr)) / 255;
+				resultG =
+					g < 128
+						? (2 * g * gg) / 255
+						: 255 - (2 * (255 - g) * (255 - gg)) / 255;
+				resultB =
+					b < 128
+						? (2 * b * gb) / 255
+						: 255 - (2 * (255 - b) * (255 - gb)) / 255;
+				break;
+			default:
+				resultR = r;
+				resultG = g;
+				resultB = b;
+		}
+
+		data[i] = Math.min(255, Math.max(0, r + (resultR - r) * opacity));
+		data[i + 1] = Math.min(255, Math.max(0, g + (resultG - g) * opacity));
+		data[i + 2] = Math.min(255, Math.max(0, b + (resultB - b) * opacity));
+	}
+
+	ctx.putImageData(imageData, x, y);
+}
+
+async function applyGrainOverlay(ctx, opacity, x, y, width, height) {
+	const imageData = ctx.getImageData(x, y, width, height);
+	const data = imageData.data;
+
+	// Generate grain using the same SVG pattern
+	const grainCanvas = document.createElement("canvas");
+	grainCanvas.width = width;
+	grainCanvas.height = height;
+	const grainCtx = grainCanvas.getContext("2d");
+
+	// Create grain pattern with noise
+	const grainData = grainCtx.createImageData(width, height);
+	const gData = grainData.data;
+
+	for (let i = 0; i < gData.length; i += 4) {
+		const noise = Math.random() * 255;
+		gData[i] = noise;
+		gData[i + 1] = noise;
+		gData[i + 2] = noise;
+		gData[i + 3] = 255;
+	}
+	grainCtx.putImageData(grainData, 0, 0);
+
+	// Get grain pixels
+	const grainPixels = grainCtx.getImageData(0, 0, width, height).data;
+
+	// Apply grain with overlay blend mode
+	for (let i = 0; i < data.length; i += 4) {
+		const r = data[i];
+		const g = data[i + 1];
+		const b = data[i + 2];
+		const gr = grainPixels[i];
+		const gg = grainPixels[i + 1];
+		const gb = grainPixels[i + 2];
+
+		// Overlay blend mode
+		const resultR =
+			r < 128 ? (2 * r * gr) / 255 : 255 - (2 * (255 - r) * (255 - gr)) / 255;
+		const resultG =
+			g < 128 ? (2 * g * gg) / 255 : 255 - (2 * (255 - g) * (255 - gg)) / 255;
+		const resultB =
+			b < 128 ? (2 * b * gb) / 255 : 255 - (2 * (255 - b) * (255 - gb)) / 255;
+
+		data[i] = Math.min(255, Math.max(0, r + (resultR - r) * opacity));
+		data[i + 1] = Math.min(255, Math.max(0, g + (resultG - g) * opacity));
+		data[i + 2] = Math.min(255, Math.max(0, b + (resultB - b) * opacity));
+	}
+
+	ctx.putImageData(imageData, x, y);
+}
+
+function applyPolaroidStamp(ctx, dateStr, width, height) {
+	// Position at bottom right with padding
+	const padding = Math.min(width, height) * 0.04;
+	const fontSize = Math.min(width, height) * 0.035;
+	const lineHeight = fontSize * 1.2;
+
+	const text1 = "AT◯M";
+	const text2 = dateStr;
+
+	ctx.save();
+
+	// Measure text
+	ctx.font = `bold ${fontSize}px "Courier New", monospace`;
+	const metrics1 = ctx.measureText(text1);
+	const metrics2 = ctx.measureText(text2);
+	const textWidth = Math.max(metrics1.width, metrics2.width);
+
+	// Position at bottom right
+	const x = width - padding - textWidth;
+	const y = height - padding - lineHeight * 2 + fontSize * 0.8;
+
+	// Draw text with shadow for readability
+	ctx.shadowColor = "rgba(0,0,0,0.3)";
+	ctx.shadowBlur = 4;
+	ctx.shadowOffsetX = 1;
+	ctx.shadowOffsetY = 1;
+
+	// Draw first line
+	ctx.textAlign = "right";
+	ctx.textBaseline = "bottom";
+	ctx.fillStyle = "rgba(255,255,255,0.9)";
+	ctx.font = `bold ${fontSize * 1.1}px "Courier New", monospace`;
+	ctx.fillText(text1, width - padding, y + lineHeight);
+
+	// Draw second line
+	ctx.font = `${fontSize * 0.8}px "Courier New", monospace`;
+	ctx.fillStyle = "rgba(255,255,255,0.7)";
+	ctx.fillText(text2, width - padding, y);
+
+	ctx.restore();
 }

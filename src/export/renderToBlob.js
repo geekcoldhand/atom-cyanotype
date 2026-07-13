@@ -582,7 +582,7 @@ function applyPolaroidStamp(ctx, dateStr, width, height) {
 	const fontSize = Math.min(width, height) * 0.035;
 	const lineHeight = fontSize * 1.2;
 
-	const text1 = "AT◯M";
+	const text1 = "AT0M";
 	const text2 = dateStr;
 
 	ctx.save();
@@ -606,13 +606,13 @@ function applyPolaroidStamp(ctx, dateStr, width, height) {
 	// Draw first line
 	ctx.textAlign = "right";
 	ctx.textBaseline = "bottom";
-	ctx.fillStyle = "rgba(255,255,255,0.9)";
+	ctx.fillStyle = "rgba(132, 88, 60, 0.9)";
 	ctx.font = `bold ${fontSize * 1.1}px "Courier New", monospace`;
 	ctx.fillText(text1, width - padding, y + lineHeight);
 
 	// Draw second line
 	ctx.font = `${fontSize * 0.8}px "Courier New", monospace`;
-	ctx.fillStyle = "rgba(255,255,255,0.7)";
+	ctx.fillStyle = "rgba(132, 88, 60, 0.7)";
 	ctx.fillText(text2, width - padding, y);
 
 	ctx.restore();

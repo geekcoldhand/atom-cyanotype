@@ -8,16 +8,17 @@ export const DEFAULTS = {
 	cyanDepth: 41, // electric cyan highlight lift
 	exposure: 8, // overall brightness lift
 	highlightLift: 20, // clean bright highlight control
-	shadowLift: 15, // lifts blacks — avoids crushed shadows
+	shadowLift: 50, // lifts blacks — avoids crushed shadows
 	midtoneContrast: 20, // tonal separation, not flatness
 	contrastSoft: 10, // negative softens overall contrast
 	grain: 25, // must exceed overlay blend threshold (~0.08 opacity)
 	lightWash: 20, // structured architectural light gradient
 	reflection: 4, // glass overlay shimmer
+	verticals: 10, // vertical lines overlay
 };
 
 /** Tab labels in display order */
-export const TABS = ["Color", "Tone", "Light"];
+export const TABS = ["Color", "Light", "Texture"];
 
 /** Sliders per tab — key must match a key in DEFAULTS */
 export const SLIDER_CONFIG = {
@@ -25,17 +26,15 @@ export const SLIDER_CONFIG = {
 		{ key: "blueDepth", label: "Blue Depth" },
 		{ key: "tealDepth", label: "Teal Depth" },
 		{ key: "cyanDepth", label: "Cyan Depth" },
-		// { key: "reflection", label: "Reflection" },
-	],
-	Tone: [
-		{ key: "exposure", label: "Exposure" },
-		// { key: "highlightLift", label: "Highlight" },
-		{ key: "shadowLift", label: "Shadow Lift" },
-		{ key: "midtoneContrast", label: "Midtone" },
 	],
 	Light: [
-		{ key: "lightWash", label: "Light Wash" },
-		{ key: "grain", label: "Grain" },
+		{ key: "exposure", label: "Exposure" },
+		{ key: "midtoneContrast", label: "Midtone" },
 		{ key: "contrastSoft", label: "Soften" },
+	],
+	Texture: [
+		{ key: "lightWash", label: "Light Wash" },
+		{ key: "verticals", label: "Verticals" },
+		{ key: "grain", label: "Grain" },
 	],
 };

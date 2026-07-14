@@ -1,3 +1,8 @@
+import React from "react";
+import { createRoot } from "react-dom/client";
+//import { toBlob } from "html-to-image";
+import { buildFilterConfig } from "../components/Preview/FilterStack";
+import { FilterStack } from "../components/Preview/FilterStack";
 /**
  * Canvas-based export that replicates FilterStack exactly
  * All filters and overlays are applied using canvas operations
@@ -83,30 +88,35 @@ export async function renderToBlob({
 	console.log("✅ Base image drawn");
 
 	// 4.2 Extract control values (matching FilterStack)
-	const {
-		blueDepth = 0,
-		tealDepth = 0,
-		cyanDepth = 0,
-		exposure = 0,
-		highlightLift = 0,
-		shadowLift = 0,
-		midtoneContrast = 0,
-		contrastSoft = 0,
-		grain = 0,
-		lightWash = 0,
-		reflection = 0,
-	} = controls;
+	// const {
+	// 	blueDepth = 0,
+	// 	tealDepth = 0,
+	// 	cyanDepth = 0,
+	// 	exposure = 0,
+	// 	highlightLift = 0,
+	// 	shadowLift = 0,
+	// 	midtoneContrast = 0,
+	// 	contrastSoft = 0,
+	// 	grain = 0,
+	// 	lightWash = 0,
+	// 	reflection = 0,
+	// 	verticals = 0,
+	// } = controls;
 
 	// 4.3 Apply base image CSS filters (contrast, brightness, saturation)
-	const contrastVal = Math.max(
-		0.5,
-		1 + midtoneContrast * 0.006 + contrastSoft * 0.004
-	);
-	const brightnessVal = Math.max(
-		0.5,
-		1 + exposure * 0.008 + shadowLift * 0.004
-	);
-	const saturateVal = Math.max(0, 0.6 + blueDepth * 0.006);
+	// const contrastVal = Math.max(
+	// 	0.5,
+	// 	1 + midtoneContrast * 0.006 + contrastSoft * 0.004
+	// );
+	// const brightnessVal = Math.max(
+	// 	0.5,
+	// 	1 + exposure * 0.008 + shadowLift * 0.004
+	// );
+	// const saturateVal = Math.max(0, 0.6 + blueDepth * 0.006);
+
+	const config = buildFilterConfig(controls);
+
+	const { contrastVal, brightnessVal, saturateVal } = config.baseFilter;
 
 	if (contrastVal !== 1) {
 		applyContrast(ctx, contrastVal, 0, 0, naturalWidth, naturalHeight);
@@ -125,10 +135,10 @@ export async function renderToBlob({
 
 	// 4.4 Apply blueBase overlay (multiply blend mode)
 	if (blueDepth > 0) {
-		const opacity = Math.min(0.9, blueDepth * 0.009);
+		config.layers.blueBase.opacity;
 		applyColorOverlay(
 			ctx,
-			"#0D2B6B",
+			config.layers.blueBase.color,
 			opacity,
 			"multiply",
 			0,
@@ -265,6 +275,78 @@ export async function renderToBlob({
 			naturalHeight
 		);
 		console.log("✅ Applied grain:", grainOpacity);
+	}
+
+	// 4.10b Apply verticals (repeating line overlay, overlay blend)
+	if (verticals > 0) {
+		const vOpacity = Math.min(0.8, verticals * 0.008);
+		const lineOpacity1 = Math.min(0.9, verticals * 0.009);
+		const lineOpacity2 = Math.min(0.7, verticals * 0.007);
+
+		const tempCanvas = document.createElement("canvas");
+		tempCanvas.width = naturalWidth;
+		tempCanvas.height = naturalHeight;
+		const tempCtx = tempCanvas.getContext("2d");
+
+		// Tile the repeating pattern across the full canvas width
+		const stripeWidth = 4;
+		for (let x = 0; x < naturalWidth; x += stripeWidth) {
+			// Semi-transparent stripe at position 0 of each tile
+			tempCtx.fillStyle = `rgba(222,222,222,${lineOpacity1})`;
+			tempCtx.fillRect(x, 0, 1, naturalHeight);
+			// White 1px line at position 1
+			tempCtx.fillStyle = `rgba(255,255,255,${lineOpacity2})`;
+			tempCtx.fillRect(x + 1, 0, 1, naturalHeight);
+		}
+
+		// Apply via overlay blend
+		applyGradientOverlay(
+			ctx,
+			{
+				gradient: "linear",
+				colors: [
+					{ pos: 0, color: "rgba(248,248,248,1)" },
+					{ pos: 1, color: "rgba(202,202,202,1)" },
+				],
+				blendMode: "overlay",
+				opacity: vOpacity * 0.3, // base gradient component
+			},
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
+		);
+
+		// Draw the stripe canvas directly over with overlay
+		const imgData = ctx.getImageData(0, 0, naturalWidth, naturalHeight);
+		const d = imgData.data;
+		const stripeData = tempCtx.getImageData(
+			0,
+			0,
+			naturalWidth,
+			naturalHeight
+		).data;
+
+		for (let i = 0; i < d.length; i += 4) {
+			const sr = stripeData[i],
+				sg = stripeData[i + 1],
+				sb = stripeData[i + 2];
+			const sa = stripeData[i + 3] / 255;
+			if (sa === 0) continue;
+			const r = d[i],
+				g = d[i + 1],
+				b = d[i + 2];
+			const rR =
+				r < 128 ? (2 * r * sr) / 255 : 255 - (2 * (255 - r) * (255 - sr)) / 255;
+			const rG =
+				g < 128 ? (2 * g * sg) / 255 : 255 - (2 * (255 - g) * (255 - sg)) / 255;
+			const rB =
+				b < 128 ? (2 * b * sb) / 255 : 255 - (2 * (255 - b) * (255 - sb)) / 255;
+			d[i] = Math.min(255, Math.max(0, r + (rR - r) * vOpacity * sa));
+			d[i + 1] = Math.min(255, Math.max(0, g + (rG - g) * vOpacity * sa));
+			d[i + 2] = Math.min(255, Math.max(0, b + (rB - b) * vOpacity * sa));
+		}
+		ctx.putImageData(imgData, 0, 0);
 	}
 
 	// 4.11 Apply shadowControl (radial gradient with multiply blend mode)
@@ -607,7 +689,7 @@ function applyPolaroidStamp(ctx, dateStr, width, height) {
 	ctx.textAlign = "right";
 	ctx.textBaseline = "bottom";
 	ctx.fillStyle = "rgba(132, 88, 60, 0.9)";
-	ctx.font = `bold ${fontSize * 1.1}px "Courier New", monospace`;
+	ctx.font = `${fontSize * 1.1}px "Courier New", monospace`;
 	ctx.fillText(text1, width - padding, y + lineHeight);
 
 	// Draw second line

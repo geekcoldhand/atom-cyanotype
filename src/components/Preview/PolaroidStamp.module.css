@@ -1,0 +1,23 @@
+/* Structural layout only — position, rotation, color, font, and shadow
+ * come from shared stamp data via inline styles (see PolaroidStamp.jsx)
+ * so they stay in sync with the canvas export renderer. */
+.stamp {
+	position: absolute;
+	transform-origin: bottom right;
+	display: flex;
+	flex-direction: row;
+	pointer-events: none;
+	user-select: none;
+	z-index: 20;
+}
+
+.wordmark {
+	font-weight: 700;
+	font-size: 0.6rem;
+	line-height: 1;
+}
+
+.date {
+	font-weight: 700;
+	line-height: 1;
+}

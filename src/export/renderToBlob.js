@@ -1,8 +1,3 @@
-import React from "react";
-import { createRoot } from "react-dom/client";
-//import { toBlob } from "html-to-image";
-import { buildFilterConfig } from "../components/Preview/FilterStack";
-import { FilterStack } from "../components/Preview/FilterStack";
 /**
  * Canvas-based export that replicates FilterStack exactly
  * All filters and overlays are applied using canvas operations
@@ -40,18 +35,16 @@ const loadImage = (src) => {
 	});
 };
 
-// ── GRAIN_SVG from constants ──────────────────────────────────────
-// This should match your GRAIN_SVG constant
-const GRAIN_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E`;
-
 export async function renderToBlob({
 	imgSrc,
 	controls,
 	naturalWidth,
 	naturalHeight,
 }) {
-	console.log("🎨 Starting canvas-based export with FilterStack filters...");
-	console.log("📊 Controls:", controls);
+	console.log(
+		"🎨 Starting canvas export with controls:",
+		JSON.stringify(controls, null, 2)
+	);
 
 	// ── 1. Get image as data URL ──────────────────────────────────
 	let imageSource = imgSrc;
@@ -81,42 +74,24 @@ export async function renderToBlob({
 	canvas.height = naturalHeight;
 	const ctx = canvas.getContext("2d");
 
-	// ── 4. Apply all filters from controls ────────────────────────
-
-	// 4.1 Draw the original image
+	// ── 4. Draw the original image ─────────────────────────────────
 	ctx.drawImage(img, 0, 0, naturalWidth, naturalHeight);
-	console.log("✅ Base image drawn");
 
-	// 4.2 Extract control values (matching FilterStack)
-	// const {
-	// 	blueDepth = 0,
-	// 	tealDepth = 0,
-	// 	cyanDepth = 0,
-	// 	exposure = 0,
-	// 	highlightLift = 0,
-	// 	shadowLift = 0,
-	// 	midtoneContrast = 0,
-	// 	contrastSoft = 0,
-	// 	grain = 0,
-	// 	lightWash = 0,
-	// 	reflection = 0,
-	// 	verticals = 0,
-	// } = controls;
-
-	// 4.3 Apply base image CSS filters (contrast, brightness, saturation)
-	// const contrastVal = Math.max(
-	// 	0.5,
-	// 	1 + midtoneContrast * 0.006 + contrastSoft * 0.004
-	// );
-	// const brightnessVal = Math.max(
-	// 	0.5,
-	// 	1 + exposure * 0.008 + shadowLift * 0.004
-	// );
-	// const saturateVal = Math.max(0, 0.6 + blueDepth * 0.006);
-
+	// ── 5. Build filter config from controls ──────────────────────
 	const config = buildFilterConfig(controls);
+	console.log("📊 Config built:", JSON.stringify(config, null, 2));
 
 	const { contrastVal, brightnessVal, saturateVal } = config.baseFilter;
+
+	// ── 6. Apply base filters ─────────────────────────────────────
+	console.log(
+		"📊 Applying base filters - contrast:",
+		contrastVal,
+		"brightness:",
+		brightnessVal,
+		"saturation:",
+		saturateVal
+	);
 
 	if (contrastVal !== 1) {
 		applyContrast(ctx, contrastVal, 0, 0, naturalWidth, naturalHeight);
@@ -133,139 +108,141 @@ export async function renderToBlob({
 		console.log("✅ Applied saturation:", saturateVal);
 	}
 
-	// 4.4 Apply blueBase overlay (multiply blend mode)
-	if (blueDepth > 0) {
-		config.layers.blueBase.opacity;
-		applyColorOverlay(
+	// ── 7. Apply solid color overlays ─────────────────────────────
+
+	// 7.1 blueBase (multiply blend)
+	const blueLayer = config.layers.blueBase;
+	console.log(
+		"📊 blueBase - opacity:",
+		blueLayer.opacity,
+		"color:",
+		blueLayer.color
+	);
+	if (blueLayer.opacity > 0.001) {
+		applySolidColorOverlay(
 			ctx,
-			config.layers.blueBase.color,
-			opacity,
-			"multiply",
+			blueLayer.color,
+			blueLayer.opacity,
+			blueLayer.blend,
 			0,
 			0,
 			naturalWidth,
 			naturalHeight
 		);
-		console.log("✅ Applied blueBase:", opacity);
+		console.log("✅ Applied blueBase:", blueLayer.opacity);
 	}
 
-	// 4.5 Apply tealGrade overlay (color blend mode)
-	if (tealDepth > 0) {
-		const opacity = Math.min(0.9, tealDepth * 0.009);
-		applyColorOverlay(
+	// 7.2 tealGrade (color blend)
+	const tealLayer = config.layers.tealGrade;
+	console.log(
+		"📊 tealGrade - opacity:",
+		tealLayer.opacity,
+		"color:",
+		tealLayer.color
+	);
+	if (tealLayer.opacity > 0.001) {
+		applySolidColorOverlay(
 			ctx,
-			"#5b848a",
-			opacity,
-			"color",
+			tealLayer.color,
+			tealLayer.opacity,
+			tealLayer.blend,
 			0,
 			0,
 			naturalWidth,
 			naturalHeight
 		);
-		console.log("✅ Applied tealGrade:", opacity);
+		console.log("✅ Applied tealGrade:", tealLayer.opacity);
 	}
 
-	// 4.6 Apply cyanLift overlay (screen blend mode)
-	if (cyanDepth > 0) {
-		const opacity = Math.min(0.8, cyanDepth * 0.008);
-		applyColorOverlay(
+	// 7.3 cyanLift (screen blend)
+	const cyanLayer = config.layers.cyanLift;
+	console.log(
+		"📊 cyanLift - opacity:",
+		cyanLayer.opacity,
+		"color:",
+		cyanLayer.color
+	);
+	if (cyanLayer.opacity > 0.001) {
+		applySolidColorOverlay(
 			ctx,
-			"#0e5398",
-			opacity,
-			"screen",
+			cyanLayer.color,
+			cyanLayer.opacity,
+			cyanLayer.blend,
 			0,
 			0,
 			naturalWidth,
 			naturalHeight
 		);
-		console.log("✅ Applied cyanLift:", opacity);
+		console.log("✅ Applied cyanLift:", cyanLayer.opacity);
 	}
 
-	// 4.7 Apply lightWash (gradient with screen blend mode)
-	if (lightWash > 0) {
-		const opacity1 = Math.min(1, 0.2 + lightWash * 0.008);
-		const opacity2 = Math.min(1, 0.1 + lightWash * 0.006);
-		const opacity3 = Math.min(1, 0.02 + lightWash * 0.002);
-		const overallOpacity = Math.min(1, 0.3 + lightWash * 0.005);
+	// ── 8. Apply gradient overlays ────────────────────────────────
 
+	// 8.1 lightWash (screen blend)
+	const lightWashLayer = config.layers.lightWash;
+	console.log("📊 lightWash - opacity:", lightWashLayer.opacity);
+	if (lightWashLayer.opacity > 0.001) {
 		applyGradientOverlay(
 			ctx,
 			{
-				gradient: "linear",
-				colors: [
-					{ pos: 0, color: `rgba(230,247,255,${opacity1})` },
-					{ pos: 0.35, color: `rgba(207,239,255,${opacity2})` },
-					{ pos: 0.65, color: `rgba(111,186,217,${opacity3})` },
-					{ pos: 1, color: "rgba(255,255,255,0)" },
-				],
-				blendMode: "screen",
-				opacity: overallOpacity,
+				gradient: lightWashLayer.gradient,
+				colors: lightWashLayer.colors,
+				blendMode: lightWashLayer.blend,
+				opacity: lightWashLayer.opacity,
 			},
 			0,
 			0,
 			naturalWidth,
 			naturalHeight
 		);
-		console.log("✅ Applied lightWash");
+		console.log("✅ Applied lightWash:", lightWashLayer.opacity);
 	}
 
-	// 4.8 Apply highlightLift (radial gradient with screen blend mode)
-	if (highlightLift > 0) {
-		const opacity1 = Math.min(1, highlightLift * 0.012);
-		const opacity2 = Math.min(1, highlightLift * 0.007);
-		const overallOpacity = Math.min(1, 0.1 + highlightLift * 0.012);
-
+	// 8.2 highlightLift (screen blend)
+	const highlightLayer = config.layers.highlightLift;
+	console.log("📊 highlightLift - opacity:", highlightLayer.opacity);
+	if (highlightLayer.opacity > 0.001) {
 		applyGradientOverlay(
 			ctx,
 			{
-				gradient: "radial",
-				colors: [
-					{ pos: 0, color: `rgba(255,255,255,${opacity1})` },
-					{ pos: 0.5, color: `rgba(207,239,255,${opacity2})` },
-					{ pos: 1, color: "rgba(255,255,255,0)" },
-				],
-				blendMode: "screen",
-				opacity: overallOpacity,
+				gradient: highlightLayer.gradient,
+				colors: highlightLayer.colors,
+				blendMode: highlightLayer.blend,
+				opacity: highlightLayer.opacity,
 			},
 			0,
 			0,
 			naturalWidth,
 			naturalHeight
 		);
-		console.log("✅ Applied highlightLift");
+		console.log("✅ Applied highlightLift:", highlightLayer.opacity);
 	}
 
-	// 4.9 Apply reflection (gradient with overlay blend mode)
-	if (reflection > 0) {
-		const opacity1 = Math.min(0.9, 0.05 + reflection * 0.006);
-		const opacity2 = Math.min(0.9, 0.03 + reflection * 0.004);
-		const opacity3 = Math.min(0.9, 0.04 + reflection * 0.005);
-		const overallOpacity = Math.min(1, 0.1 + reflection * 0.007);
-
+	// 8.3 reflection (overlay blend)
+	const reflectionLayer = config.layers.reflection;
+	console.log("📊 reflection - opacity:", reflectionLayer.opacity);
+	if (reflectionLayer.opacity > 0.001) {
 		applyGradientOverlay(
 			ctx,
 			{
-				gradient: "linear",
-				angle: 135,
-				colors: [
-					{ pos: 0, color: `rgba(255,255,255,${opacity1})` },
-					{ pos: 0.5, color: `rgba(207,239,255,${opacity2})` },
-					{ pos: 1, color: `rgba(255,255,255,${opacity3})` },
-				],
-				blendMode: "overlay",
-				opacity: overallOpacity,
+				gradient: reflectionLayer.gradient,
+				angle: reflectionLayer.angle || 135,
+				colors: reflectionLayer.colors,
+				blendMode: reflectionLayer.blend,
+				opacity: reflectionLayer.opacity,
 			},
 			0,
 			0,
 			naturalWidth,
 			naturalHeight
 		);
-		console.log("✅ Applied reflection");
+		console.log("✅ Applied reflection:", reflectionLayer.opacity);
 	}
 
-	// 4.10 Apply grain (overlay blend mode)
-	if (grain > 0) {
-		const grainOpacity = Math.min(0.65, grain * 0.009);
+	// ── 9. Apply grain (overlay blend) ────────────────────────────
+	const grainOpacity = Math.min(0.65, (controls.grain || 0) * 0.009);
+	console.log("📊 grain - opacity:", grainOpacity);
+	if (grainOpacity > 0.001) {
 		await applyGrainOverlay(
 			ctx,
 			grainOpacity,
@@ -277,92 +254,38 @@ export async function renderToBlob({
 		console.log("✅ Applied grain:", grainOpacity);
 	}
 
-	// 4.10b Apply verticals (repeating line overlay, overlay blend)
-	if (verticals > 0) {
-		const vOpacity = Math.min(0.8, verticals * 0.008);
-		const lineOpacity1 = Math.min(0.9, verticals * 0.009);
-		const lineOpacity2 = Math.min(0.7, verticals * 0.007);
+	// ── 10. Apply verticals ───────────────────────────────────────
+	const verticalsValue = controls.verticals || 0;
+	console.log("📊 verticals - value:", verticalsValue);
+	if (verticalsValue > 0) {
+		const vOpacity = Math.min(0.8, verticalsValue * 0.008);
+		const lineOpacity1 = Math.min(0.9, verticalsValue * 0.009);
+		const lineOpacity2 = Math.min(0.7, verticalsValue * 0.007);
 
-		const tempCanvas = document.createElement("canvas");
-		tempCanvas.width = naturalWidth;
-		tempCanvas.height = naturalHeight;
-		const tempCtx = tempCanvas.getContext("2d");
-
-		// Tile the repeating pattern across the full canvas width
-		const stripeWidth = 4;
-		for (let x = 0; x < naturalWidth; x += stripeWidth) {
-			// Semi-transparent stripe at position 0 of each tile
-			tempCtx.fillStyle = `rgba(222,222,222,${lineOpacity1})`;
-			tempCtx.fillRect(x, 0, 1, naturalHeight);
-			// White 1px line at position 1
-			tempCtx.fillStyle = `rgba(255,255,255,${lineOpacity2})`;
-			tempCtx.fillRect(x + 1, 0, 1, naturalHeight);
-		}
-
-		// Apply via overlay blend
-		applyGradientOverlay(
+		applyVerticalsOverlay(
 			ctx,
-			{
-				gradient: "linear",
-				colors: [
-					{ pos: 0, color: "rgba(248,248,248,1)" },
-					{ pos: 1, color: "rgba(202,202,202,1)" },
-				],
-				blendMode: "overlay",
-				opacity: vOpacity * 0.3, // base gradient component
-			},
+			vOpacity,
+			lineOpacity1,
+			lineOpacity2,
 			0,
 			0,
 			naturalWidth,
 			naturalHeight
 		);
-
-		// Draw the stripe canvas directly over with overlay
-		const imgData = ctx.getImageData(0, 0, naturalWidth, naturalHeight);
-		const d = imgData.data;
-		const stripeData = tempCtx.getImageData(
-			0,
-			0,
-			naturalWidth,
-			naturalHeight
-		).data;
-
-		for (let i = 0; i < d.length; i += 4) {
-			const sr = stripeData[i],
-				sg = stripeData[i + 1],
-				sb = stripeData[i + 2];
-			const sa = stripeData[i + 3] / 255;
-			if (sa === 0) continue;
-			const r = d[i],
-				g = d[i + 1],
-				b = d[i + 2];
-			const rR =
-				r < 128 ? (2 * r * sr) / 255 : 255 - (2 * (255 - r) * (255 - sr)) / 255;
-			const rG =
-				g < 128 ? (2 * g * sg) / 255 : 255 - (2 * (255 - g) * (255 - sg)) / 255;
-			const rB =
-				b < 128 ? (2 * b * sb) / 255 : 255 - (2 * (255 - b) * (255 - sb)) / 255;
-			d[i] = Math.min(255, Math.max(0, r + (rR - r) * vOpacity * sa));
-			d[i + 1] = Math.min(255, Math.max(0, g + (rG - g) * vOpacity * sa));
-			d[i + 2] = Math.min(255, Math.max(0, b + (rB - b) * vOpacity * sa));
-		}
-		ctx.putImageData(imgData, 0, 0);
+		console.log("✅ Applied verticals:", vOpacity);
 	}
 
-	// 4.11 Apply shadowControl (radial gradient with multiply blend mode)
-	const shadowOpacity = Math.min(0.8, 0.05 + (100 - shadowLift) * 0.003);
-	if (shadowOpacity > 0) {
+	// ── 11. Apply shadowControl (multiply blend) ──────────────────
+	const shadowLayer = config.layers.shadowControl;
+	console.log("📊 shadowControl - opacity:", shadowLayer.opacity);
+	if (shadowLayer.opacity > 0.001) {
 		applyGradientOverlay(
 			ctx,
 			{
-				gradient: "radial",
-				colors: [
-					{ pos: 0, color: "rgba(255,255,255,0)" },
-					{ pos: 0.25, color: "rgba(255,255,255,0)" },
-					{ pos: 1, color: `rgba(10,26,47,${shadowOpacity})` },
-				],
-				blendMode: "multiply",
-				opacity: 0.7,
+				gradient: shadowLayer.gradient,
+				colors: shadowLayer.colors,
+				blendMode: shadowLayer.blend,
+				opacity: shadowLayer.opacity,
 			},
 			0,
 			0,
@@ -372,7 +295,7 @@ export async function renderToBlob({
 		console.log("✅ Applied shadowControl");
 	}
 
-	// 4.12 Add Polaroid stamp (text overlay)
+	// ── 12. Add Polaroid stamp ────────────────────────────────────
 	const now = new Date();
 	const dateStr = `${String(now.getMonth() + 1).padStart(
 		2,
@@ -381,7 +304,7 @@ export async function renderToBlob({
 	applyPolaroidStamp(ctx, dateStr, naturalWidth, naturalHeight);
 	console.log("✅ Applied Polaroid stamp");
 
-	// ── 5. Convert to blob ──────────────────────────────────────────
+	// ── 13. Convert to blob ──────────────────────────────────────
 	return new Promise((resolve, reject) => {
 		canvas.toBlob(
 			(blob) => {
@@ -397,6 +320,9 @@ export async function renderToBlob({
 		);
 	});
 }
+
+// ── Import buildFilterConfig from FilterStack ──────────────────
+import { buildFilterConfig } from "../components/Preview/FilterStack.jsx";
 
 // ── Filter Implementation Functions ──────────────────────────────
 
@@ -453,7 +379,7 @@ function applySaturation(ctx, factor, x, y, width, height) {
 	ctx.putImageData(imageData, x, y);
 }
 
-function applyColorOverlay(
+function applySolidColorOverlay(
 	ctx,
 	color,
 	opacity,
@@ -491,7 +417,6 @@ function applyColorOverlay(
 				resultB = 255 - ((255 - b) * (255 - overlayB)) / 255;
 				break;
 			case "color":
-				// Color blend mode - keep luminance, use overlay hue/saturation
 				const luminance = 0.2989 * r + 0.587 * g + 0.114 * b;
 				resultR = luminance * (overlayR / 255);
 				resultG = luminance * (overlayG / 255);
@@ -611,7 +536,7 @@ async function applyGrainOverlay(ctx, opacity, x, y, width, height) {
 	const imageData = ctx.getImageData(x, y, width, height);
 	const data = imageData.data;
 
-	// Generate grain using the same SVG pattern
+	// Generate grain pattern with noise
 	const grainCanvas = document.createElement("canvas");
 	grainCanvas.width = width;
 	grainCanvas.height = height;
@@ -642,7 +567,6 @@ async function applyGrainOverlay(ctx, opacity, x, y, width, height) {
 		const gg = grainPixels[i + 1];
 		const gb = grainPixels[i + 2];
 
-		// Overlay blend mode
 		const resultR =
 			r < 128 ? (2 * r * gr) / 255 : 255 - (2 * (255 - r) * (255 - gr)) / 255;
 		const resultG =
@@ -658,28 +582,84 @@ async function applyGrainOverlay(ctx, opacity, x, y, width, height) {
 	ctx.putImageData(imageData, x, y);
 }
 
+function applyVerticalsOverlay(
+	ctx,
+	opacity,
+	lineOpacity1,
+	lineOpacity2,
+	x,
+	y,
+	width,
+	height
+) {
+	const imageData = ctx.getImageData(x, y, width, height);
+	const data = imageData.data;
+
+	// Create vertical line pattern
+	const patternCanvas = document.createElement("canvas");
+	patternCanvas.width = width;
+	patternCanvas.height = height;
+	const patternCtx = patternCanvas.getContext("2d");
+
+	// Draw vertical lines with repeating pattern
+	const stripeWidth = 4;
+	for (let xPos = 0; xPos < width; xPos += stripeWidth) {
+		// Semi-transparent stripe
+		patternCtx.fillStyle = `rgba(222,222,222,${lineOpacity1})`;
+		patternCtx.fillRect(xPos, 0, 1, height);
+		// White 1px line
+		patternCtx.fillStyle = `rgba(255,255,255,${lineOpacity2})`;
+		patternCtx.fillRect(xPos + 1, 0, 1, height);
+	}
+
+	const patternData = patternCtx.getImageData(0, 0, width, height).data;
+
+	// Apply with overlay blend mode
+	for (let i = 0; i < data.length; i += 4) {
+		const r = data[i];
+		const g = data[i + 1];
+		const b = data[i + 2];
+		const pr = patternData[i];
+		const pg = patternData[i + 1];
+		const pb = patternData[i + 2];
+		const pa = patternData[i + 3] / 255;
+
+		if (pa === 0) continue;
+
+		const resultR =
+			r < 128 ? (2 * r * pr) / 255 : 255 - (2 * (255 - r) * (255 - pr)) / 255;
+		const resultG =
+			g < 128 ? (2 * g * pg) / 255 : 255 - (2 * (255 - g) * (255 - pg)) / 255;
+		const resultB =
+			b < 128 ? (2 * b * pb) / 255 : 255 - (2 * (255 - b) * (255 - pb)) / 255;
+
+		data[i] = Math.min(255, Math.max(0, r + (resultR - r) * opacity * pa));
+		data[i + 1] = Math.min(255, Math.max(0, g + (resultG - g) * opacity * pa));
+		data[i + 2] = Math.min(255, Math.max(0, b + (resultB - b) * opacity * pa));
+	}
+
+	ctx.putImageData(imageData, x, y);
+}
+
 function applyPolaroidStamp(ctx, dateStr, width, height) {
-	// Position at bottom right with padding
 	const padding = Math.min(width, height) * 0.04;
 	const fontSize = Math.min(width, height) * 0.035;
 	const lineHeight = fontSize * 1.2;
 
-	const text1 = "AT0M";
+	const text1 = "AT◯M";
 	const text2 = dateStr;
 
 	ctx.save();
 
-	// Measure text
 	ctx.font = `bold ${fontSize}px "Courier New", monospace`;
 	const metrics1 = ctx.measureText(text1);
 	const metrics2 = ctx.measureText(text2);
 	const textWidth = Math.max(metrics1.width, metrics2.width);
 
-	// Position at bottom right
 	const x = width - padding - textWidth;
 	const y = height - padding - lineHeight * 2 + fontSize * 0.8;
 
-	// Draw text with shadow for readability
+	// Shadow for readability
 	ctx.shadowColor = "rgba(0,0,0,0.3)";
 	ctx.shadowBlur = 4;
 	ctx.shadowOffsetX = 1;
@@ -689,7 +669,7 @@ function applyPolaroidStamp(ctx, dateStr, width, height) {
 	ctx.textAlign = "right";
 	ctx.textBaseline = "bottom";
 	ctx.fillStyle = "rgba(132, 88, 60, 0.9)";
-	ctx.font = `${fontSize * 1.1}px "Courier New", monospace`;
+	ctx.font = `bold ${fontSize * 1.1}px "Courier New", monospace`;
 	ctx.fillText(text1, width - padding, y + lineHeight);
 
 	// Draw second line

@@ -331,7 +331,7 @@ repeating-linear-gradient(
 
 			{/* Polaroid imprint — visible in both preview and export */}
 			<div className={styles.polaroidStamp}>
-				<div className={styles.atomWordmark}>AT&#9675;M</div>
+				<div className={styles.atomWordmark}>AT0M</div>
 				<div className={styles.atomDate}>{dateStr}</div>
 			</div>
 

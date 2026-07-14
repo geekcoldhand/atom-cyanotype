@@ -35,6 +35,9 @@ const loadImage = (src) => {
 	});
 };
 
+// ── GRAIN_SVG - Same as in controls.js ──────────────────────────
+const GRAIN_SVG = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`;
+
 export async function renderToBlob({
 	imgSrc,
 	controls,
@@ -84,15 +87,6 @@ export async function renderToBlob({
 	const { contrastVal, brightnessVal, saturateVal } = config.baseFilter;
 
 	// ── 6. Apply base filters ─────────────────────────────────────
-	console.log(
-		"📊 Applying base filters - contrast:",
-		contrastVal,
-		"brightness:",
-		brightnessVal,
-		"saturation:",
-		saturateVal
-	);
-
 	if (contrastVal !== 1) {
 		applyContrast(ctx, contrastVal, 0, 0, naturalWidth, naturalHeight);
 		console.log("✅ Applied contrast:", contrastVal);
@@ -112,12 +106,6 @@ export async function renderToBlob({
 
 	// 7.1 blueBase (multiply blend)
 	const blueLayer = config.layers.blueBase;
-	console.log(
-		"📊 blueBase - opacity:",
-		blueLayer.opacity,
-		"color:",
-		blueLayer.color
-	);
 	if (blueLayer.opacity > 0.001) {
 		applySolidColorOverlay(
 			ctx,
@@ -134,12 +122,6 @@ export async function renderToBlob({
 
 	// 7.2 tealGrade (color blend)
 	const tealLayer = config.layers.tealGrade;
-	console.log(
-		"📊 tealGrade - opacity:",
-		tealLayer.opacity,
-		"color:",
-		tealLayer.color
-	);
 	if (tealLayer.opacity > 0.001) {
 		applySolidColorOverlay(
 			ctx,
@@ -156,12 +138,6 @@ export async function renderToBlob({
 
 	// 7.3 cyanLift (screen blend)
 	const cyanLayer = config.layers.cyanLift;
-	console.log(
-		"📊 cyanLift - opacity:",
-		cyanLayer.opacity,
-		"color:",
-		cyanLayer.color
-	);
 	if (cyanLayer.opacity > 0.001) {
 		applySolidColorOverlay(
 			ctx,
@@ -180,7 +156,6 @@ export async function renderToBlob({
 
 	// 8.1 lightWash (screen blend)
 	const lightWashLayer = config.layers.lightWash;
-	console.log("📊 lightWash - opacity:", lightWashLayer.opacity);
 	if (lightWashLayer.opacity > 0.001) {
 		applyGradientOverlay(
 			ctx,
@@ -200,7 +175,6 @@ export async function renderToBlob({
 
 	// 8.2 highlightLift (screen blend)
 	const highlightLayer = config.layers.highlightLift;
-	console.log("📊 highlightLift - opacity:", highlightLayer.opacity);
 	if (highlightLayer.opacity > 0.001) {
 		applyGradientOverlay(
 			ctx,
@@ -220,7 +194,6 @@ export async function renderToBlob({
 
 	// 8.3 reflection (overlay blend)
 	const reflectionLayer = config.layers.reflection;
-	console.log("📊 reflection - opacity:", reflectionLayer.opacity);
 	if (reflectionLayer.opacity > 0.001) {
 		applyGradientOverlay(
 			ctx,
@@ -239,11 +212,10 @@ export async function renderToBlob({
 		console.log("✅ Applied reflection:", reflectionLayer.opacity);
 	}
 
-	// ── 9. Apply grain (overlay blend) ────────────────────────────
+	// ── 9. Apply grain using SVG (matches FilterStack CSS) ──────
 	const grainOpacity = Math.min(0.65, (controls.grain || 0) * 0.009);
-	console.log("📊 grain - opacity:", grainOpacity);
 	if (grainOpacity > 0.001) {
-		await applyGrainOverlay(
+		await applyGrainOverlaySVG(
 			ctx,
 			grainOpacity,
 			0,
@@ -251,12 +223,11 @@ export async function renderToBlob({
 			naturalWidth,
 			naturalHeight
 		);
-		console.log("✅ Applied grain:", grainOpacity);
+		console.log("✅ Applied grain (SVG):", grainOpacity);
 	}
 
 	// ── 10. Apply verticals ───────────────────────────────────────
 	const verticalsValue = controls.verticals || 0;
-	console.log("📊 verticals - value:", verticalsValue);
 	if (verticalsValue > 0) {
 		const vOpacity = Math.min(0.8, verticalsValue * 0.008);
 		const lineOpacity1 = Math.min(0.9, verticalsValue * 0.009);
@@ -277,7 +248,6 @@ export async function renderToBlob({
 
 	// ── 11. Apply shadowControl (multiply blend) ──────────────────
 	const shadowLayer = config.layers.shadowControl;
-	console.log("📊 shadowControl - opacity:", shadowLayer.opacity);
 	if (shadowLayer.opacity > 0.001) {
 		applyGradientOverlay(
 			ctx,
@@ -532,54 +502,76 @@ function applyGradientOverlay(ctx, config, x, y, width, height) {
 	ctx.putImageData(imageData, x, y);
 }
 
-async function applyGrainOverlay(ctx, opacity, x, y, width, height) {
-	const imageData = ctx.getImageData(x, y, width, height);
-	const data = imageData.data;
-
-	// Generate grain pattern with noise
+/**
+ * Apply grain using SVG texture (matches CSS approach)
+ * This renders the GRAIN_SVG to a canvas and composites it with overlay blend mode
+ */
+async function applyGrainOverlaySVG(ctx, opacity, x, y, width, height) {
+	// Create a temporary canvas for the grain
 	const grainCanvas = document.createElement("canvas");
 	grainCanvas.width = width;
 	grainCanvas.height = height;
 	const grainCtx = grainCanvas.getContext("2d");
 
-	// Create grain pattern with noise
-	const grainData = grainCtx.createImageData(width, height);
-	const gData = grainData.data;
+	// Load and draw the SVG grain pattern
+	return new Promise((resolve) => {
+		const img = new Image();
+		img.onload = () => {
+			// Draw the grain SVG pattern tiled across the canvas
+			// The SVG is 256x256, so we tile it
+			const patternWidth = 256;
+			const patternHeight = 256;
 
-	for (let i = 0; i < gData.length; i += 4) {
-		const noise = Math.random() * 255;
-		gData[i] = noise;
-		gData[i + 1] = noise;
-		gData[i + 2] = noise;
-		gData[i + 3] = 255;
-	}
-	grainCtx.putImageData(grainData, 0, 0);
+			for (let ty = 0; ty < height; ty += patternHeight) {
+				for (let tx = 0; tx < width; tx += patternWidth) {
+					grainCtx.drawImage(img, tx, ty, patternWidth, patternHeight);
+				}
+			}
 
-	// Get grain pixels
-	const grainPixels = grainCtx.getImageData(0, 0, width, height).data;
+			// Now apply the grain with overlay blend mode
+			const imageData = ctx.getImageData(x, y, width, height);
+			const data = imageData.data;
+			const grainData = grainCtx.getImageData(0, 0, width, height).data;
 
-	// Apply grain with overlay blend mode
-	for (let i = 0; i < data.length; i += 4) {
-		const r = data[i];
-		const g = data[i + 1];
-		const b = data[i + 2];
-		const gr = grainPixels[i];
-		const gg = grainPixels[i + 1];
-		const gb = grainPixels[i + 2];
+			for (let i = 0; i < data.length; i += 4) {
+				const r = data[i];
+				const g = data[i + 1];
+				const b = data[i + 2];
 
-		const resultR =
-			r < 128 ? (2 * r * gr) / 255 : 255 - (2 * (255 - r) * (255 - gr)) / 255;
-		const resultG =
-			g < 128 ? (2 * g * gg) / 255 : 255 - (2 * (255 - g) * (255 - gg)) / 255;
-		const resultB =
-			b < 128 ? (2 * b * gb) / 255 : 255 - (2 * (255 - b) * (255 - gb)) / 255;
+				// Grain is grayscale, use R channel
+				const gr = grainData[i];
+				const gg = grainData[i + 1];
+				const gb = grainData[i + 2];
 
-		data[i] = Math.min(255, Math.max(0, r + (resultR - r) * opacity));
-		data[i + 1] = Math.min(255, Math.max(0, g + (resultG - g) * opacity));
-		data[i + 2] = Math.min(255, Math.max(0, b + (resultB - b) * opacity));
-	}
+				// Overlay blend mode
+				const resultR =
+					r < 128
+						? (2 * r * gr) / 255
+						: 255 - (2 * (255 - r) * (255 - gr)) / 255;
+				const resultG =
+					g < 128
+						? (2 * g * gg) / 255
+						: 255 - (2 * (255 - g) * (255 - gg)) / 255;
+				const resultB =
+					b < 128
+						? (2 * b * gb) / 255
+						: 255 - (2 * (255 - b) * (255 - gb)) / 255;
 
-	ctx.putImageData(imageData, x, y);
+				data[i] = Math.min(255, Math.max(0, r + (resultR - r) * opacity));
+				data[i + 1] = Math.min(255, Math.max(0, g + (resultG - g) * opacity));
+				data[i + 2] = Math.min(255, Math.max(0, b + (resultB - b) * opacity));
+			}
+
+			ctx.putImageData(imageData, x, y);
+			resolve();
+		};
+
+		// Load the SVG as an image
+		// The GRAIN_SVG constant has 'url("...")' wrapper, we need to extract the URL
+		const svgUrl = GRAIN_SVG.replace(/^url\("|"\)$/g, "");
+		img.crossOrigin = "anonymous";
+		img.src = svgUrl;
+	});
 }
 
 function applyVerticalsOverlay(
@@ -642,40 +634,80 @@ function applyVerticalsOverlay(
 }
 
 function applyPolaroidStamp(ctx, dateStr, width, height) {
-	const padding = Math.min(width, height) * 0.04;
+	// ── Match CSS positioning ──────────────────────────────────────
+	// CSS: right: 1%, bottom: 15%, transform: rotate(270deg)
+	// transform-origin: bottom right
+	
+	// Calculate position (bottom right, rotated 270deg)
+	const paddingRight = width * 0.01;  // 1% from right
+	const paddingBottom = height * 0.18; // 15% from bottom
+	
+	// Font sizing - match CSS proportions
 	const fontSize = Math.min(width, height) * 0.035;
-	const lineHeight = fontSize * 1.2;
-
-	const text1 = "AT◯M";
-	const text2 = dateStr;
-
+	const gap = fontSize * 0.6; // 0.6rem gap
+	
+	// ── Text measurements ──────────────────────────────────────────
 	ctx.save();
-
-	ctx.font = `bold ${fontSize}px "Courier New", monospace`;
+	
+	// Use the same font as CSS
+	ctx.font = `bold ${fontSize}px "Courier New", Courier, monospace`;
+	const text1 = "AT0M";
+	const text2 = dateStr;
+	
 	const metrics1 = ctx.measureText(text1);
 	const metrics2 = ctx.measureText(text2);
-	const textWidth = Math.max(metrics1.width, metrics2.width);
-
-	const x = width - padding - textWidth;
-	const y = height - padding - lineHeight * 2 + fontSize * 0.8;
-
-	// Shadow for readability
+	const textHeight = fontSize * 1.2; // Approximate line height
+	
+	// ── Position calculation for rotated text ────────────────────
+	// CSS: transform: rotate(270deg) with transform-origin: bottom right
+	// This means the text is rotated 270deg (or -90deg) around bottom-right corner
+	// So the text reads from bottom to top, aligned to the right edge
+	
+	// The origin point (bottom-right corner of the text block)
+	const originX = width - paddingRight;
+	const originY = height - paddingBottom;
+	
+	// Translate to origin, rotate, then draw
+	ctx.translate(originX, originY);
+	ctx.rotate(-Math.PI / 2); // 270deg = -90deg
+	
+	// ── Text styling ──────────────────────────────────────────────
+	ctx.textAlign = "right";
+	ctx.textBaseline = "bottom";
+	
+	// Shadow for readability (matches CSS shadow)
 	ctx.shadowColor = "rgba(0,0,0,0.3)";
 	ctx.shadowBlur = 4;
 	ctx.shadowOffsetX = 1;
 	ctx.shadowOffsetY = 1;
-
-	// Draw first line
-	ctx.textAlign = "right";
-	ctx.textBaseline = "bottom";
-	ctx.fillStyle = "rgba(132, 88, 60, 0.9)";
-	ctx.font = `bold ${fontSize * 1.1}px "Courier New", monospace`;
-	ctx.fillText(text1, width - padding, y + lineHeight);
-
-	// Draw second line
-	ctx.font = `${fontSize * 0.8}px "Courier New", monospace`;
-	ctx.fillStyle = "rgba(132, 88, 60, 0.7)";
-	ctx.fillText(text2, width - padding, y);
-
+	
+	// ── Draw text in row (flex-direction: row, gap: 0.6rem) ──────
+	// Since we're rotated, "row" means horizontal in the rotated space
+	// We draw text1 then text2 with a gap between them
+	
+	const totalWidth = metrics1.width + gap + metrics2.width;
+	
+	// Position text1 (right-aligned, so it's at the right edge)
+	const text1X = 0;
+	const text1Y = 0;
+	
+	// Position text2 (to the left of text1 with gap)
+	const text2X = -(metrics1.width + gap);
+	const text2Y = 0;
+	
+	// Draw first text (AT0M) - larger and bolder
+	ctx.font = `bold ${fontSize}px "Courier New", Courier, monospace`;
+	ctx.fillStyle = "#945925"; // Match CSS color
+	ctx.shadowColor = "rgba(0,0,0,0.3)";
+	ctx.shadowBlur = 4;
+	ctx.shadowOffsetX = 1;
+	ctx.shadowOffsetY = 1;
+	ctx.fillText(text1, text1X, text1Y);
+	
+	// Draw second text (date) - regular weight
+	ctx.font = `${fontSize * 0.8}px "Courier New", Courier, monospace`;
+	ctx.fillStyle = "#945925";
+	ctx.fillText(text2, text2X, text2Y);
+	
 	ctx.restore();
 }

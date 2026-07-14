@@ -3,8 +3,8 @@ export const GRAIN_SVG = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' x
 
 /** Default slider values — Y2K Cyber Minimalism preset */
 export const DEFAULTS = {
-	blueDepth: 25, // deep navy/steel blue — shadows and base
-	tealDepth: 30, // teal midtone push
+	blueDepth: 5, // deep navy/steel blue — shadows and base
+	tealDepth: 3, // teal midtone push
 	cyanDepth: 41, // electric cyan highlight lift
 	exposure: 8, // overall brightness lift
 	highlightLift: 20, // clean bright highlight control

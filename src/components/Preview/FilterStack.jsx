@@ -3,18 +3,18 @@ import styles from "./FilterStack.module.css";
 
 export function buildFilterConfig(controls) {
 	const {
-		blueDepth,
-		tealDepth,
-		cyanDepth,
-		exposure,
-		highlightLift,
-		shadowLift,
-		midtoneContrast,
-		contrastSoft,
-		grain,
-		lightWash,
-		reflection,
-		verticals,
+		blueDepth = 0,
+		tealDepth = 0,
+		cyanDepth = 0,
+		exposure = 0,
+		highlightLift = 0,
+		shadowLift = 0,
+		midtoneContrast = 0,
+		contrastSoft = 0,
+		grain = 0,
+		lightWash = 0,
+		reflection = 0,
+		verticals = 0,
 	} = controls;
 
 	const contrastVal = Math.max(
@@ -56,15 +56,77 @@ export function buildFilterConfig(controls) {
 			},
 
 			lightWash: {
-				value: lightWash,
+				gradient: "linear",
+				blend: "screen",
+				opacity: Math.min(1, 0.3 + lightWash * 0.005),
+				colors: [
+					{
+						pos: 0,
+						color: `rgba(230,247,255,${Math.min(1, 0.2 + lightWash * 0.008)})`,
+					},
+					{
+						pos: 0.35,
+						color: `rgba(207,239,255,${Math.min(1, 0.1 + lightWash * 0.006)})`,
+					},
+					{
+						pos: 0.65,
+						color: `rgba(111,186,217,${Math.min(1, 0.02 + lightWash * 0.002)})`,
+					},
+					{
+						pos: 1,
+						color: "rgba(255,255,255,0)",
+					},
+				],
 			},
 
 			highlightLift: {
-				value: highlightLift,
+				gradient: "radial",
+				blend: "screen",
+				opacity: Math.min(1, 0.1 + highlightLift * 0.012),
+				colors: [
+					{
+						pos: 0,
+						color: `rgba(255,255,255,${Math.min(1, highlightLift * 0.012)})`,
+					},
+					{
+						pos: 0.5,
+						color: `rgba(207,239,255,${Math.min(1, highlightLift * 0.007)})`,
+					},
+					{
+						pos: 1,
+						color: "rgba(255,255,255,0)",
+					},
+				],
 			},
 
 			reflection: {
-				value: reflection,
+				gradient: "linear",
+				angle: 135,
+				blend: "overlay",
+				opacity: Math.min(1, 0.1 + reflection * 0.007),
+				colors: [
+					{
+						pos: 0,
+						color: `rgba(255,255,255,${Math.min(
+							0.9,
+							0.05 + reflection * 0.006
+						)})`,
+					},
+					{
+						pos: 0.5,
+						color: `rgba(207,239,255,${Math.min(
+							0.9,
+							0.03 + reflection * 0.004
+						)})`,
+					},
+					{
+						pos: 1,
+						color: `rgba(255,255,255,${Math.min(
+							0.9,
+							0.04 + reflection * 0.005
+						)})`,
+					},
+				],
 			},
 
 			grain: {
@@ -77,7 +139,28 @@ export function buildFilterConfig(controls) {
 			},
 
 			shadowControl: {
-				value: shadowLift,
+				gradient: "radial",
+				blend: "multiply",
+				opacity: 0.7,
+				colors: [
+					{
+						pos: 0,
+						color: "rgba(255,255,255,0)",
+					},
+					{
+						pos: 0.25,
+						color: "rgba(255,255,255,0)",
+					},
+					{
+						pos: 1,
+						color: `rgba(
+                10,
+                26,
+                47,
+                ${Math.min(0.8, 0.05 + (100 - shadowLift) * 0.003)}
+            )`,
+					},
+				],
 			},
 		},
 	};
@@ -111,34 +194,13 @@ export function FilterStack({
 	width, // explicit px width  (export mode only)
 	height, // explicit px height (export mode only)
 }) {
-	const {
-		blueDepth,
-		tealDepth,
-		cyanDepth,
-		exposure,
-		highlightLift,
-		shadowLift,
-		midtoneContrast,
-		contrastSoft,
-		grain,
-		lightWash,
-		reflection,
-		verticals,
-	} = controls;
+	// ── Get config from buildFilterConfig ─────────────────────────
+	const config = buildFilterConfig(controls);
+	const { contrastVal, brightnessVal, saturateVal } = config.baseFilter;
 
 	const isExportMode = !!(width && height);
 
 	// ── Base image CSS filter ──────────────────────────────────────
-	const contrastVal = Math.max(
-		0.5,
-		1 + midtoneContrast * 0.006 + contrastSoft * 0.004
-	);
-	const brightnessVal = Math.max(
-		0.5,
-		1 + exposure * 0.008 + shadowLift * 0.004
-	);
-	const saturateVal = Math.max(0, 0.6 + blueDepth * 0.006);
-
 	const baseFilter = [
 		`contrast(${contrastVal})`,
 		`brightness(${brightnessVal})`,
@@ -148,52 +210,47 @@ export function FilterStack({
 	// ── Overlay layers ─────────────────────────────────────────────
 	const layers = {
 		blueBase: {
-			background: "#0D2B6B",
-			mixBlendMode: "multiply",
-			opacity: Math.min(0.9, blueDepth * 0.009),
+			background: config.layers.blueBase.color,
+			mixBlendMode: config.layers.blueBase.blend,
+			opacity: config.layers.blueBase.opacity,
 		},
 		tealGrade: {
-			background: "#5b848a",
-			mixBlendMode: "color",
-			opacity: Math.min(0.9, tealDepth * 0.009),
+			background: config.layers.tealGrade.color,
+			mixBlendMode: config.layers.tealGrade.blend,
+			opacity: config.layers.tealGrade.opacity,
 		},
 		cyanLift: {
-			background: "#0e5398",
-			mixBlendMode: "screen",
-			opacity: Math.min(0.8, cyanDepth * 0.008),
+			background: config.layers.cyanLift.color,
+			mixBlendMode: config.layers.cyanLift.blend,
+			opacity: config.layers.cyanLift.opacity,
 		},
 		lightWash: {
-			background: `linear-gradient(180deg,
-        rgba(230,247,255,${Math.min(1, 0.2 + lightWash * 0.008)}) 0%,
-        rgba(207,239,255,${Math.min(1, 0.1 + lightWash * 0.006)}) 35%,
-        rgba(111,186,217,${Math.min(1, 0.02 + lightWash * 0.002)}) 65%,
-        transparent 100%)`,
-			mixBlendMode: "screen",
-			opacity: Math.min(1, 0.3 + lightWash * 0.005),
+			background: `linear-gradient(180deg, ${config.layers.lightWash.colors
+				.map((c) => `${c.color} ${c.pos * 100}%`)
+				.join(", ")})`,
+			mixBlendMode: config.layers.lightWash.blend,
+			opacity: config.layers.lightWash.opacity,
 		},
 		highlightLift: {
-			background: `radial-gradient(
-        ellipse 80% 45% at 50% 0%,
-        rgba(255,255,255,${Math.min(1, highlightLift * 0.012)}) 0%,
-        rgba(207,239,255,${Math.min(1, highlightLift * 0.007)}) 50%,
-        transparent 100%)`,
-			mixBlendMode: "screen",
-			opacity: Math.min(1, 0.1 + highlightLift * 0.012),
+			background: `radial-gradient(ellipse 80% 45% at 50% 0%, ${config.layers.highlightLift.colors
+				.map((c) => `${c.color} ${c.pos * 100}%`)
+				.join(", ")})`,
+			mixBlendMode: config.layers.highlightLift.blend,
+			opacity: config.layers.highlightLift.opacity,
 		},
 		reflection: {
-			background: `linear-gradient(135deg,
-        rgba(255,255,255,${Math.min(0.9, 0.05 + reflection * 0.006)}) 0%,
-        rgba(207,239,255,${Math.min(0.9, 0.03 + reflection * 0.004)}) 50%,
-        rgba(255,255,255,${Math.min(0.9, 0.04 + reflection * 0.005)}) 100%)`,
-			mixBlendMode: "overlay",
-			opacity: Math.min(1, 0.1 + reflection * 0.007),
+			background: `linear-gradient(135deg, ${config.layers.reflection.colors
+				.map((c) => `${c.color} ${c.pos * 100}%`)
+				.join(", ")})`,
+			mixBlendMode: config.layers.reflection.blend,
+			opacity: config.layers.reflection.opacity,
 		},
 		grain: {
 			backgroundImage: GRAIN_SVG,
 			backgroundSize: "200px 200px",
 			backgroundRepeat: "repeat",
 			mixBlendMode: "overlay",
-			opacity: Math.min(0.65, grain * 0.009),
+			opacity: Math.min(0.65, (controls.grain || 0) * 0.009),
 		},
 		verticals: {
 			backgroundImage: `
@@ -206,18 +263,14 @@ repeating-linear-gradient(
 )
 `,
 			mixBlendMode: "multiply",
-			opacity: Math.min(0.8, verticals * 0.008),
+			opacity: Math.min(0.8, (controls.verticals || 0) * 0.008),
 		},
-
 		shadowControl: {
-			background: `radial-gradient(ellipse 110% 110% at 50% 50%,
-        transparent 25%,
-        rgba(10,26,47,${Math.min(
-					0.8,
-					0.05 + (100 - shadowLift) * 0.003
-				)}) 100%)`,
-			mixBlendMode: "multiply",
-			opacity: 0.7,
+			background: `radial-gradient(ellipse 110% 110% at 50% 50%, ${config.layers.shadowControl.colors
+				.map((c) => `${c.color} ${c.pos * 100}%`)
+				.join(", ")})`,
+			mixBlendMode: config.layers.shadowControl.blend,
+			opacity: config.layers.shadowControl.opacity,
 		},
 	};
 
@@ -229,9 +282,6 @@ repeating-linear-gradient(
 	)}/${now.getFullYear()}`;
 
 	// ── Root sizing ────────────────────────────────────────────────
-	// Export mode: explicit pixel dimensions so the off-screen render
-	// matches the natural image size exactly.
-	// Preview mode: CSS handles responsive sizing via FilterStack.module.css.
 	const rootStyle = isExportMode
 		? {
 				width: `${width}px`,

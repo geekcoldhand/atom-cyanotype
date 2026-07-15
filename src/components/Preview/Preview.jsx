@@ -4,15 +4,15 @@ import styles from './Preview.module.css'
 
 /**
  * Preview — renders only the visible FilterStack.
- * Passes previewRef into FilterStack so html-to-image can find the DOM node.
- * Contains no export-specific logic and no hidden rendering containers.
+ * Contains no export-specific logic and no hidden rendering containers;
+ * export is produced independently by the canvas pipeline in
+ * src/rendering/, sharing config with FilterStack (see src/rendering/filterConfig.js).
  */
 export function Preview({
   previewRef,
   imgSrc,
   controls,
   imgRef,
-  canvasRef,
   onFile,
   onImageLoad,
   onPreviewTap,
@@ -41,7 +41,6 @@ export function Preview({
             imgSrc={imgSrc}
             controls={controls}
             imgRef={imgRef}
-            canvasRef={canvasRef}
             onLoad={onImageLoad}
           />
 

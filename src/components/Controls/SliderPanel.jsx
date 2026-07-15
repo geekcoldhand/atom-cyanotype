@@ -10,12 +10,12 @@ export function SliderPanel({ activeTab, controls, setControl }) {
 
   return (
     <div className={styles.panel}>
-      {sliders.map(({ key, label }) => (
+      {sliders.map(({ key, label, min }) => (
         <SliderRow
           key={key}
-          sliderKey={key}
           label={label}
           value={controls[key]}
+          min={min}
           onChange={setControl(key)}
         />
       ))}

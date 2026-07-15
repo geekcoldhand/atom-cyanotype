@@ -23,37 +23,6 @@
   pointer-events: none;
   border-radius: 4px;
 }
-.polaroidStamp {
-	position: absolute;
 
-	right: 1%;
-	bottom: 15%;
-
-	transform: rotate(270deg);
-	transform-origin: bottom right;
-
-	display: flex;
-	flex-direction: row;
-	gap: 0.6rem;
-
-	color: #945925;
-
-	font-family: "Courier New", Courier, monospace;
-
-	pointer-events: none;
-	user-select: none;
-
-	z-index: 20;
-}
-
-.atomWordmark {
-	font-weight: 700;
-	font-size: 0.6rem;
-	line-height: 1;
-}
-
-.atomDate {
-	font-weight: 700;
-	font-size: 0.5rem;
-	line-height: 1;
-}
+/* Polaroid stamp styling now lives in PolaroidStamp.jsx / .module.css,
+ * sharing its geometry with the canvas export renderer. */

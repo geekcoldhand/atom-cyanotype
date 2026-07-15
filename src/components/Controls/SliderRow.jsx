@@ -3,14 +3,12 @@ import styles from './SliderRow.module.css'
 /**
  * A single labeled range slider row.
  *
- * @param {string}   label      - display label
- * @param {string}   sliderKey  - the control key (used to set min for contrastSoft)
- * @param {number}   value      - current value
- * @param {function} onChange   - called with new numeric value
+ * @param {string}   label    - display label
+ * @param {number}   value    - current value
+ * @param {number}   [min=0]  - minimum value (from SLIDER_CONFIG, per-slider)
+ * @param {function} onChange - called with new numeric value
  */
-export function SliderRow({ label, sliderKey, value, onChange }) {
-  const min = sliderKey === 'contrastSoft' ? -50 : 0
-
+export function SliderRow({ label, value, min = 0, onChange }) {
   return (
     <div className={styles.row}>
       <span className={styles.label}>{label}</span>

@@ -6,7 +6,6 @@ import { Controls } from "./components/Controls/Controls.jsx";
 import { ProcessingOverlay } from "./components/ProcessingOverlay/ProcessingOverlay.jsx";
 
 import { useControls } from "./hooks/useControls.js";
-import { useDustCanvas } from "./hooks/useDustCanvas.js";
 
 import { renderToBlob } from "./export/renderToBlob.js";
 import { saveBlob } from "./export/saveBlob.js";
@@ -20,12 +19,14 @@ export default function App() {
 	const [controlsVisible, setControlsVisible] = useState(true);
 
 	const { controls, setControl } = useControls();
-	const { canvasRef, imgRef, initDust } = useDustCanvas(0, !!imgSrc);
+	const imgRef = useRef(null);
 	// Add state for original file
 	const [originalFile, setOriginalFile] = useState(null);
 
-	// previewRef is attached to the FilterStack root div.
-	// renderToBlob no longer uses it — it mounts its own off-screen instance.
+	// previewRef is attached to the FilterStack root div (currently
+	// unused by the export path — export renders independently via the
+	// canvas pipeline in src/rendering/, sharing config with FilterStack
+	// rather than screenshotting its DOM).
 	const previewRef = useRef(null);
 
 	const fileToDataURL = (file) => {
@@ -61,8 +62,7 @@ export default function App() {
 		if (img) {
 			setNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
 		}
-		initDust();
-	}, [initDust, imgRef]);
+	}, [imgRef]);
 
 	// ── Controls toggle ────────────────────────────────────────────
 	const handlePreviewTap = useCallback(() => {
@@ -74,8 +74,9 @@ export default function App() {
 	}, []);
 
 	// ── Export ─────────────────────────────────────────────────────
-	// renderToBlob receives imgSrc + controls + natural dimensions.
-	// It mounts its own off-screen FilterStack — App owns no export DOM.
+	// renderToBlob receives imgSrc + controls + natural dimensions and
+	// paints the shared layer config (src/rendering/) onto an off-screen
+	// canvas — App owns no export DOM.
 	//
 	// NOTE: navigator.share() on iOS must be called within the user-gesture
 	// call stack. renderToBlob is async but triggered directly by the tap,
@@ -109,7 +110,6 @@ export default function App() {
 				imgSrc={imgSrc}
 				controls={controls}
 				imgRef={imgRef}
-				canvasRef={canvasRef}
 				onFile={handleFile}
 				onImageLoad={handleImageLoad}
 				onPreviewTap={handlePreviewTap}

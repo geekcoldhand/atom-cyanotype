@@ -1,5 +1,8 @@
-/** Encoded SVG grain texture — finer baseFrequency for clean Y2K texture */
-export const GRAIN_SVG = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`;
+/**
+ * UI/control metadata only. Rendering-specific constants (grain texture,
+ * opacity curves, gradient/stamp geometry) live in src/rendering/constants.js —
+ * see the architectural review, Section 9, for why these were split.
+ */
 
 /** Default slider values — Y2K Cyber Minimalism preset */
 export const DEFAULTS = {
@@ -20,7 +23,13 @@ export const DEFAULTS = {
 /** Tab labels in display order */
 export const TABS = ["Color", "Light", "Texture"];
 
-/** Sliders per tab — key must match a key in DEFAULTS */
+/**
+ * Sliders per tab — key must match a key in DEFAULTS.
+ * `min` defaults to 0 when omitted (see SliderRow.jsx); only sliders that
+ * need a non-zero minimum (like `contrastSoft`, which can go negative to
+ * soften contrast) specify it here, instead of SliderRow special-casing
+ * a hardcoded key name.
+ */
 export const SLIDER_CONFIG = {
 	Color: [
 		{ key: "blueDepth", label: "Blue Depth" },
@@ -30,7 +39,7 @@ export const SLIDER_CONFIG = {
 	Light: [
 		{ key: "exposure", label: "Exposure" },
 		{ key: "midtoneContrast", label: "Midtone" },
-		{ key: "contrastSoft", label: "Soften" },
+		{ key: "contrastSoft", label: "Soften", min: -50 },
 	],
 	Texture: [
 		{ key: "lightWash", label: "Light Wash" },
